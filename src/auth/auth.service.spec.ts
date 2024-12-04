@@ -2,12 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User, UserRole } from './entities/user.entity';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TestDatabaseModule } from '../../test/helpers/database.helper';
 import { Shipment } from '../shipments/entities/shipment.entity';
 import { ShipmentLocation } from '../shipments/entities/shipment-location.entity';
 import { Carrier } from '../carriers/entities/carrier.entity';
 import { GPSData } from '../gps/entities/gps-data.entity';
+import { JwtModule } from '@nestjs/jwt';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -20,6 +21,14 @@ describe('AuthService', () => {
         }),
         TestDatabaseModule,
         TypeOrmModule.forFeature([User, Shipment, ShipmentLocation, Carrier, GPSData]),
+        JwtModule.registerAsync({
+          imports: [ConfigModule],
+          useFactory: (configService: ConfigService) => ({
+            secret: configService.get('JWT_SECRET'),
+            signOptions: { expiresIn: configService.get('JWT_EXPIRES_IN') },
+          }),
+          inject: [ConfigService],
+        }),
       ],
       providers: [AuthService],
     }).compile();
@@ -28,7 +37,7 @@ describe('AuthService', () => {
   }, 30000);
 
   it('should create a user', async () => {
-    const user = await service.createUser({
+    const user = await service.registerUser({
       username: 'testuser',
       password: 'password123',
       role: UserRole.CUSTOMER,
@@ -40,14 +49,14 @@ describe('AuthService', () => {
   });
 
   it('should throw on duplicate username', async () => {
-    await service.createUser({
+    await service.registerUser({
       username: 'testuser2',
       password: 'password123',
       role: UserRole.CUSTOMER,
     });
 
     await expect(
-      service.createUser({
+      service.registerUser({
         username: 'testuser2',
         password: 'password123',
         role: UserRole.CUSTOMER,
@@ -56,23 +65,23 @@ describe('AuthService', () => {
   });
 
   it('should validate user credentials', async () => {
-    await service.createUser({
+    await service.registerUser({
       username: 'testuser3',
       password: 'password123',
       role: UserRole.CUSTOMER,
     });
 
-    const validUser = await service.validateUser({
+    const validUser = await service.loginUser({
       username: 'testuser3',
       password: 'password123',
     });
     expect(validUser).toBeDefined();
-    expect(validUser.username).toBe('testuser3');
+    expect(validUser.accessToken).toBeDefined();
   });
 
   it('should reject invalid credentials', async () => {
     await expect(
-      service.validateUser({
+      service.loginUser({
         username: 'nonexistent',
         password: 'wrongpass',
       }),

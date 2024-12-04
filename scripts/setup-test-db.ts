@@ -7,7 +7,6 @@ async function setupTestDatabase() {
   const configService = new ConfigService();
 
   try {
-    // Connect to postgres database
     const connection = new DataSource({
       type: 'postgres',
       host: configService.get('DATABASE_HOST'),
