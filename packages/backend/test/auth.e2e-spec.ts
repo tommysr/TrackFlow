@@ -6,7 +6,7 @@ import { UserRole } from '../src/auth/entities/user.entity';
 import { DataSource } from 'typeorm';
 import { User } from '../src/auth/entities/user.entity';
 import * as bcrypt from 'bcrypt';
-import { CreateGPSDataDto } from 'src/gps/dto/create-gps-data.dto';
+import { CreateGPSDataDto } from 'packages/backend/src/gps/dto/create-gps-data.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
