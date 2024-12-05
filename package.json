@@ -12,7 +12,7 @@
   "scripts": {
     "backend": "npm run start --workspace=backend",
     "backend:dev": "npm run start:dev --workspace=backend",
-    "frontend": "npm run dev --workspace=frontend",
+    "frontend": "npm run start --workspace=frontend",
     "canister": "npm run start --workspace=canister",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
