@@ -8,7 +8,10 @@ const config: Config.InitialOptions = {
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
-  setupFiles: ['<rootDir>/test/jest-e2e.setup.ts'],
+  setupFiles: ['./jest-e2e.setup.ts'],
+  moduleNameMapper: {
+    '^src/(.*)$': './../src/$1',
+  },
 };
 
-export default config; 
+export default config;

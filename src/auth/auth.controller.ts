@@ -13,7 +13,7 @@ export class AuthController {
   @ApiOperation({ summary: 'User registration' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   register(@Body() createUserDto: CreateUserDto) {
-    return this.authService.createUser(createUserDto);
+    return this.authService.registerUser(createUserDto);
   }
 
   @Post('login')
@@ -21,6 +21,6 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @HttpCode(HttpStatus.OK)
   login(@Body() loginUserDto: LoginUserDto) {
-    return this.authService.validateUser(loginUserDto);
+    return this.authService.loginUser(loginUserDto);
   }
 } 

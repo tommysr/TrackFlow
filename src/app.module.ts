@@ -6,11 +6,11 @@ import { ShipmentsModule } from './shipments/shipments.module';
 import { CarriersModule } from './carriers/carriers.module';
 import { GPSModule } from './gps/gps.module';
 
-
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: process.env.NODE_ENV == 'test' ? '.env.test' : '.env',
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -22,7 +22,7 @@ import { GPSModule } from './gps/gps.module';
         password: configService.get('DATABASE_PASSWORD'),
         database: configService.get('DATABASE_NAME'),
         autoLoadEntities: true,
-        synchronize: process.env.NODE_ENV !== 'production',
+        synchronize: process.env.NODE_ENV === 'test',
       }),
       inject: [ConfigService],
     }),
