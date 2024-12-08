@@ -20,10 +20,7 @@ const config = {
       $src: './src',
       $styles: './src/styles',
       '$styles/*': './src/sass/*',
-    }
-  },
-  compilerOptions: {
-    // runes: true,
+    },
   },
 };
 
