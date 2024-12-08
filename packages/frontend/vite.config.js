@@ -3,12 +3,13 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import environment from 'vite-plugin-environment';
 import dotenv from 'dotenv';
-
+import topLevelAwait from 'vite-plugin-top-level-await';
 dotenv.config({ path: '../../.env' });
 
 export default defineConfig({
   build: {
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1024000
   },
   optimizeDeps: {
     esbuildOptions: {
@@ -27,6 +28,7 @@ export default defineConfig({
   },
   plugins: [
     sveltekit(),
+    topLevelAwait(),
     environment("all", { prefix: "CANISTER_" }),
     environment("all", { prefix: "DFX_" }),
   ],

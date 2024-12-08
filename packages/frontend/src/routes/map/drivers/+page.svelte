@@ -1,4 +1,4 @@
 <svelte:head>
-	<title>Home</title>
+	<title>Drivers</title>
 	<meta name="description" content="Svelte demo app" />
 </svelte:head>
