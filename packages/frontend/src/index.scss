@@ -1,37 +1,165 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	:root {
+		--text-50: #ecf3f8;
+		--text-100: #d9e8f2;
+		--text-200: #b3d0e5;
+		--text-300: #8db9d8;
+		--text-400: #67a1cb;
+		--text-500: #418abe;
+		--text-600: #346e98;
+		--text-700: #275372;
+		--text-800: #1a374c;
+		--text-900: #0d1c26;
+		--text-950: #070e13;
+
+		--background-50: #edf4f8;
+		--background-100: #dae8f1;
+		--background-200: #b6d2e2;
+		--background-300: #91bbd4;
+		--background-400: #6ca5c6;
+		--background-500: #478eb8;
+		--background-600: #397293;
+		--background-700: #2b556e;
+		--background-800: #1d3949;
+		--background-900: #0e1c25;
+		--background-950: #070e12;
+		--primary-50: #ecf3f8;
+		--primary-100: #d9e7f2;
+		--primary-200: #b4cee4;
+		--primary-300: #8eb6d7;
+		--primary-400: #689eca;
+		--primary-500: #4286bd;
+		--primary-600: #356b97;
+		--primary-700: #285071;
+		--primary-800: #1b354b;
+		--primary-900: #0d1b26;
+		--primary-950: #070d13;
+		--secondary-50: #edecf8;
+		--secondary-100: #dbd9f2;
+		--secondary-200: #b6b3e5;
+		--secondary-300: #928dd8;
+		--secondary-400: #6e67cb;
+		--secondary-500: #4941be;
+		--secondary-600: #3b3498;
+		--secondary-700: #2c2772;
+		--secondary-800: #1d1a4c;
+		--secondary-900: #0f0d26;
+		--secondary-950: #070713;
+		--accent-50: #efecf8;
+		--accent-100: #e0d9f2;
+		--accent-200: #c1b4e4;
+		--accent-300: #a18ed7;
+		--accent-400: #8268ca;
+		--accent-500: #6342bd;
+		--accent-600: #4f3597;
+		--accent-700: #3b2871;
+		--accent-800: #281b4b;
+		--accent-900: #140d26;
+		--accent-950: #0a0713;
+	}
+	.dark {
+		--text-50: #060d13;
+		--text-100: #0d1b26;
+		--text-200: #19364d;
+		--text-300: #265073;
+		--text-400: #336b99;
+		--text-500: #4086bf;
+		--text-600: #669ecc;
+		--text-700: #8cb6d9;
+		--text-800: #b3cfe6;
+		--text-900: #d9e7f2;
+		--text-950: #ecf3f9;
+		--background-50: #070d12;
+		--background-100: #0f1b24;
+		--background-200: #1d3549;
+		--background-300: #2c506d;
+		--background-400: #3a6a92;
+		--background-500: #4985b6;
+		--background-600: #6d9dc5;
+		--background-700: #92b6d3;
+		--background-800: #b6cee2;
+		--background-900: #dbe7f0;
+		--background-950: #edf3f8;
+		--primary-50: #070d13;
+		--primary-100: #0d1b26;
+		--primary-200: #1b354b;
+		--primary-300: #285071;
+		--primary-400: #356b97;
+		--primary-500: #4286bd;
+		--primary-600: #689eca;
+		--primary-700: #8eb6d7;
+		--primary-800: #b4cee4;
+		--primary-900: #d9e7f2;
+		--primary-950: #ecf3f8;
+		--secondary-50: #070713;
+		--secondary-100: #0f0d26;
+		--secondary-200: #1d1a4c;
+		--secondary-300: #2c2772;
+		--secondary-400: #3b3498;
+		--secondary-500: #4941be;
+		--secondary-600: #6e67cb;
+		--secondary-700: #928dd8;
+		--secondary-800: #b6b3e5;
+		--secondary-900: #dbd9f2;
+		--secondary-950: #edecf8;
+		--accent-50: #0a0713;
+		--accent-100: #140d26;
+		--accent-200: #281b4b;
+		--accent-300: #3b2871;
+		--accent-400: #4f3597;
+		--accent-500: #6342bd;
+		--accent-600: #8268ca;
+		--accent-700: #a18ed7;
+		--accent-800: #c1b4e4;
+		--accent-900: #e0d9f2;
+		--accent-950: #efecf8;
+	}
+
+	:root {
+		--text: #0a151d;
+		--background: #f2f7fa;
+		--primary: #4689be;
+		--secondary: #9691d9;
+		--accent: #8b72ce;
+	}
+	.dark {
+		--text: #e1ecf5;
+		--background: #060b0f;
+		--primary: #4183b9;
+		--secondary: #2b266e;
+		--accent: #49318c;
+	}
+}
+
+
 body {
-  font-family: sans-serif;
-  font-size: 1.5rem;
+	background-color: var(--background);
+	--tw-text-opacity: 1;
+  color: rgb(82 82 82 / var(--tw-text-opacity));
 }
 
-img {
-  max-width: 50vw;
-  max-height: 25vw;
-  display: block;
-  margin: auto;
+*:focus {
+	outline: none;
 }
 
-form {
-  display: flex;
-  justify-content: center;
-  gap: 0.5em;
-  flex-flow: row wrap;
-  max-width: 40vw;
-  margin: auto;
-  align-items: baseline;
+.custome-button {
+	border: 4px solid var(--background);
+	border-image-slice: 1;
+
+	border-left: 0;
+	border-right: 0;
+	border-top: 0;
+	padding: 5px 10px 5px;
 }
 
-button[type="submit"] {
-  padding: 5px 20px;
-  margin: 10px auto;
-  float: right;
+.custome-button:hover {
+	border-image-source: linear-gradient(to left, var(--primary), var(--secondary));
 }
 
-#greeting {
-  margin: 10px auto;
-  padding: 10px 60px;
-  border: 1px solid #222;
-}
-
-#greeting:empty {
-  display: none;
+.active-nav {
+	border-image-source: linear-gradient(to left, var(--secondary), var(--primary));
 }
