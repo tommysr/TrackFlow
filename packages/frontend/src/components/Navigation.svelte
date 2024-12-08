@@ -2,12 +2,13 @@
   import { page } from '$app/stores';
   import clsx from 'clsx';
   import HomeIcon from './HomeIcon.svelte';
-  import { Box, TruckIcon } from 'lucide-svelte';
+  import { AppleIcon, Box, TruckIcon } from 'lucide-svelte';
   import SendIcon from './SendIcon.svelte';
   import { wallet } from '$src/lib/wallet.svelte';
   import Button from './Button.svelte';
 
-  let currentPage = $page.url.pathname;
+  let apiConnected = $state(false);
+  let currentPage = $derived($page.url.pathname);
   let isNavbarOpen = $state(false);
   let navigationItems = $derived([
     { label: 'Home', href: '/', Component: HomeIcon },
@@ -116,30 +117,42 @@
     <nav class="">
       <ul class="flex h-3/4 flex-col items-center space-y-12">
         {#each navigationItems as { label, href }}
-          <div
-            class={clsx(
-              'p-5 rounded-xl flex flex-col justify-center items-center',
-              currentPage == href ? 'bg-primary-100' : 'p-20',
-            )}
-          >
-            <a
-              {href}
-              onclick={() => (isNavbarOpen = false)}
+          {#if label !== 'Track'}
+            <div
               class={clsx(
-                'text-2xl',
-                currentPage === href
-                  ? 'bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent'
-                  : '',
+                'p-5 rounded-xl flex flex-col justify-center items-center',
+                currentPage == href ? 'bg-primary-100' : 'p-20',
               )}
             >
-              {label}
-            </a>
-          </div>
+              <a
+                {href}
+                onclick={() => (isNavbarOpen = false)}
+                class={clsx(
+                  'text-2xl',
+                  currentPage === href
+                    ? 'bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent'
+                    : '',
+                )}
+              >
+                {label}
+              </a>
+            </div>
+          {/if}
         {/each}
       </ul>
     </nav>
 
-    <div class="mb-5">
+    <div class="mb-5 space-y-2">
+      {#if apiConnected}
+        <Button onClick={() => {}}>
+          Connected to API
+        </Button>
+      {:else}
+        <Button onClick={async () => console.log('connect api')}
+          >Connect API</Button
+        >
+      {/if}
+
       {#if $wallet.connected && $wallet.identity}
         <Button onClick={() => {}}>
           Identity {$wallet.identity.getPrincipal().toText().substring(0, 6)}...
