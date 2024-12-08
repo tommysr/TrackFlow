@@ -3,7 +3,7 @@
   import '../index.scss';
 
   import type { Snippet } from 'svelte';
-  import { MapLibre } from 'svelte-maplibre';
+  import { GeolocateControl, MapLibre } from 'svelte-maplibre';
 
   const { children } = $props<{
     children: Snippet;
@@ -15,10 +15,16 @@
 <Navigation />
 
 <MapLibre
-		style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
-		class="maplibre relative w-full sm:aspect-video h-screen z-0"
-		zoom={5}
-		center={defaultLocation}
-	>
+  style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+  class="maplibre relative w-full sm:aspect-video h-screen z-0"
+  zoom={5}
+  center={defaultLocation}
+>
+  <GeolocateControl
+    position="bottom-left"
+    fitBoundsOptions={{ maxZoom: 12 }}
+    showAccuracyCircle={false}
+  />
+
   {@render children()}
 </MapLibre>
