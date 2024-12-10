@@ -4,8 +4,10 @@ import { defineConfig } from 'vite';
 import environment from 'vite-plugin-environment';
 import dotenv from 'dotenv';
 import topLevelAwait from 'vite-plugin-top-level-await';
-dotenv.config({ path: '../../.env' });
+import wasm from 'vite-plugin-wasm';
 
+
+dotenv.config({ path: '../../../.env' });
 export default defineConfig({
   build: {
     emptyOutDir: true,
@@ -27,6 +29,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    wasm(),
     sveltekit(),
     topLevelAwait(),
     environment("all", { prefix: "CANISTER_" }),

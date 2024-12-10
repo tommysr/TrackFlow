@@ -35,7 +35,8 @@
         "packages/frontend/dist"
       ],
       "type": "assets",
-      "workspace": "frontend"
+      "workspace": "packages/frontend",
+      "build": "bun run --filter=frontend build "
     }
   },
   "defaults": {

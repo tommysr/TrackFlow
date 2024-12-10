@@ -52,14 +52,5 @@ export const connect = async () => {
   return { actor, identity };
 };
 
-
-export const mockConnect = async () => {
-  // const { actor, identity } = await connect();
-  return { actor: undefined, identity: undefined };
-};
-
 export const contractCanister = canisterIds.frontend.local;
 
-export const testContract = await createTestActor(contractCanister, {
-  agentOptions: { host: 'http://localhost:4943', fetch },
-});
