@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use super::{carrier::Carrier, customer::Customer, shipment_id::ShipmentIdInner};
 use anyhow::Context;
 use candid::{CandidType, Principal};

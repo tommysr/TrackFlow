@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use super::shipment_id::ShipmentIdInner;
 use candid::Principal;
 use serde::{Deserialize, Serialize};
