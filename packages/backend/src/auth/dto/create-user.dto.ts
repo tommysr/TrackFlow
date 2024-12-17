@@ -1,5 +1,5 @@
 import { IsEnum, IsString, MinLength } from 'class-validator';
-import { UserRole } from '../entities/user.entity';
+import { UserRole } from '../entities/icp.user.entity';
 
 export class CreateUserDto {
   @IsString()

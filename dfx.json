@@ -22,7 +22,7 @@
       },
       "package": "canister",
       "type": "rust",
-      "build": "./build.sh contract"
+      "build": "./build.sh canister"
     },
     "frontend": {
       "declarations": {

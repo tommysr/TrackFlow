@@ -6,18 +6,23 @@ CANISTERS="$1"
 
 function generate_did() {
   local canister=$1
-  canister_root="src/$canister"
+  canister_root="packages/$canister"
 
+  echo "Building $canister"
 
   cargo build --manifest-path="$canister_root/Cargo.toml" \
       --target wasm32-unknown-unknown \
       --release --package "$canister" 
 
+  echo "Generating candid for $canister"
   candid-extractor "target/wasm32-unknown-unknown/release/$canister.wasm" > "$canister_root/$canister.did" 
 
+  echo "Generating metadata for $canister"
   ic-wasm "target/wasm32-unknown-unknown/release/$canister.wasm" \
       -o "target/wasm32-unknown-unknown/release/$canister.wasm" \
       metadata candid:service -v public -f "$canister_root/$canister.did"
+
+  echo "Generating declarations for $canister"
 }
 
 
