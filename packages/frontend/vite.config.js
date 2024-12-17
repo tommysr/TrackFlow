@@ -7,7 +7,8 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 import wasm from 'vite-plugin-wasm';
 
 
-dotenv.config({ path: '../../../.env' });
+dotenv.config({ path: '../../.env' });
+console.log('process.env', process.env);
 export default defineConfig({
   build: {
     emptyOutDir: true,

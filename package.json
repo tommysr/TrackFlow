@@ -18,5 +18,10 @@
     "test": "bun run test --workspaces",
     "lint": "bun run lint --workspaces",
     "format": "prettier --write \"packages/**/*.{json,js,jsx,ts,tsx,css,scss}\""
+  },
+  "dependencies": {
+    "@dfinity/auth-client": "^2.1.3",
+    "@dfinity/identity": "^2.1.3",
+    "@slide-computer/signer": "git+https://github.com/slide-computer/signer-js.git#main"
   }
 }

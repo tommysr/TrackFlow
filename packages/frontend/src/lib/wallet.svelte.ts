@@ -1,9 +1,8 @@
 import type { ActorSubclass, Identity } from '@dfinity/agent';
-import { get, writable } from 'svelte/store';
+import { writable } from 'svelte/store';
 import type { _SERVICE } from '../../../declarations/canister/canister.did';
-import { canisterId } from '../../../declarations/canister/index';
 import { connect } from './canisters';
-import { Principal } from '@dfinity/principal';
+import type { Delegation, DelegationsWithUserKey } from '$lib/canisters';
 
 export const wallet = createWallet();
 
@@ -11,18 +10,21 @@ export let stateWallet: MaybeWallet = $state({
   connected: false,
   actor: undefined,
   identity: undefined,
+  delegations: undefined,
 });
 
 export interface Wallet {
   connected: true;
   actor: ActorSubclass<_SERVICE>;
   identity: Identity;
+  delegations: DelegationsWithUserKey;
 }
 
 export interface MaybeWallet {
   connected: boolean;
   actor: ActorSubclass<_SERVICE> | undefined;
   identity: Identity | undefined;
+  delegations: DelegationsWithUserKey | undefined;
 }
 
 function createWallet() {
@@ -33,13 +35,13 @@ function createWallet() {
   return {
     subscribe,
     connect: async () => {
-      const { actor, identity } = await connect();
-      console.log(identity.getPrincipal().toText());
-      const wallet = { connected: true, actor, identity };
+      const { actor, identity, delegations } = await connect();
+      const wallet = { connected: true, actor, identity, delegations };
       set(wallet);
       stateWallet.connected = true;
       stateWallet.actor = actor;
       stateWallet.identity = identity;
+      stateWallet.delegations = delegations;
     },
   };
 }

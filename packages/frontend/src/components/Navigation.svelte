@@ -2,7 +2,7 @@
   import { page } from '$app/stores';
   import clsx from 'clsx';
   import HomeIcon from './HomeIcon.svelte';
-  import { AppleIcon, Box, TruckIcon } from 'lucide-svelte';
+  import { Box, TruckIcon } from 'lucide-svelte';
   import SendIcon from './SendIcon.svelte';
   import { wallet } from '$src/lib/wallet.svelte';
   import Button from './Button.svelte';
@@ -16,6 +16,55 @@
     { label: 'Drivers', href: '/map/drivers', Component: TruckIcon },
     { label: 'Track', href: '/map/track', Component: SendIcon },
   ]);
+
+  export async function fetchChallenge(): Promise<{ sessionId: string; challenge: string }> {
+    const response = await fetch('http://localhost:5000/auth/challenge');
+    if (!response.ok) {
+      throw new Error('Failed to fetch challenge');
+    }
+    return response.json();
+  }
+
+  async function connectApi() {
+    if (!$wallet.connected) {
+      await wallet.connect();
+    }
+
+    if (!$wallet.connected) return;
+
+    const { sessionId, challenge } = await fetchChallenge();
+
+    const delegationIdentity = {
+      kind: 'authorize-client-success',
+      delegations: $wallet.delegations.delegations,
+      userPublicKey: $wallet.delegations.userKey,
+    };
+
+    const response = await fetch('http://localhost:5000/auth/icp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(
+        {
+          sessionId,
+          challenge,
+          delegationIdentity,
+        },
+        (_, v) => {
+          return typeof v === 'bigint' ? v.toString() : v;
+        },
+      ),
+    });
+
+    if (response.ok) {
+      const { accessToken } = await response.json();
+      localStorage.setItem('api_token', accessToken);
+      apiConnected = true;
+    } else {
+      console.error('API connection failed');
+    }
+  }
 
   $inspect(currentPage);
 </script>
@@ -144,13 +193,9 @@
 
     <div class="mb-5 space-y-2">
       {#if apiConnected}
-        <Button onClick={() => {}}>
-          Connected to API
-        </Button>
+        <Button onClick={() => {}}>Connected to API</Button>
       {:else}
-        <Button onClick={async () => console.log('connect api')}
-          >Connect API</Button
-        >
+        <Button onClick={connectApi}>Connect API</Button>
       {/if}
 
       {#if $wallet.connected && $wallet.identity}
