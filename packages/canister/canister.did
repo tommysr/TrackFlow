@@ -1,3 +1,35 @@
-service : {
-    "greet": (text) -> (text) query;
+type Result = variant { Ok; Err : text };
+type Result_1 = variant { Ok : nat64; Err : text };
+type Shipment = record {
+  id : nat64;
+  status : ShipmentStatus;
+  customer : principal;
+  info : ShipmentInfo;
+  name : text;
+  created_at : nat64;
+  message : opt text;
+  hashed_secret : text;
+  carrier : opt principal;
+};
+type ShipmentInfo = record {
+  destination : ShipmentLocation;
+  value : nat64;
+  source : ShipmentLocation;
+  size_category : SizeCategory;
+  price : nat64;
+};
+type ShipmentLocation = record { lat : float64; lng : float64; street : text };
+type ShipmentStatus = variant { InTransit; Delivered; Cancelled; Pending };
+type SizeCategory = variant {
+  Parcel : record { max_height : nat64; max_width : nat64; max_depth : nat64 };
+  Envelope;
+};
+service : () -> {
+  buyShipment : (text, nat64) -> (Result);
+  createShipment : (text, text, text, ShipmentInfo) -> (Result_1);
+  finalizeShipment : (nat64, opt text) -> (Result);
+  listPendingShipments : () -> (vec Shipment) query;
+  listUserShipments : () -> (vec Shipment, vec Shipment) query;
+  roles : () -> (bool, bool) query;
+  shipments : () -> (vec Shipment) query;
 }

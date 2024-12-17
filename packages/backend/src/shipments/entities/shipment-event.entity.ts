@@ -9,11 +9,8 @@ export class ShipmentEvent {
   @ManyToOne(() => Shipment, (shipment) => shipment.events)
   shipment: Shipment;
 
-  @Column({
-    type: 'enum',
-    enum: ShipmentStatus,
-  })
-  status: ShipmentStatus;
+  // @Column({ type: 'enum', enum: ShipmentStatus, default: ShipmentStatus.CREATED })
+  // status: ShipmentStatus;
 
   @CreateDateColumn()
   eventTime: Date;
