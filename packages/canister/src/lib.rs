@@ -1,3 +1,5 @@
+mod state;
+mod models;
 
 #[ic_cdk::query]
 fn greet(name: String) -> String {
