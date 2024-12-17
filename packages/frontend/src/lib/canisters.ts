@@ -113,7 +113,7 @@ export const connect = async () => {
       challenge: challengeResponse.challenge,
       signature: arrayBufferToBase64(signature),
       publicKey: arrayBufferToBase64(publicKey),
-      rootKey: arrayBufferToBase64(LOCAL_DFINITY_ROOT_KEY),
+      rootKey: arrayBufferToBase64(LOCAL_DFINITY_ROOT_KEY.buffer),
       delegationsIdentity: {
         delegations: processedDelegations,
         userPublicKey: Array.from(delegations.userKey),
