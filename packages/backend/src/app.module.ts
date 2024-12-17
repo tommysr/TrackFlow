@@ -22,7 +22,7 @@ import { GPSModule } from './gps/gps.module';
         password: configService.get('DATABASE_PASSWORD'),
         database: configService.get('DATABASE_NAME'),
         autoLoadEntities: true,
-        synchronize: process.env.NODE_ENV === 'test',
+        synchronize: process.env.NODE_ENV == 'test',
       }),
       inject: [ConfigService],
     }),
