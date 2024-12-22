@@ -5,6 +5,9 @@ import { AuthModule } from './auth/auth.module';
 import { ShipmentsModule } from './shipments/shipments.module';
 import { CarriersModule } from './carriers/carriers.module';
 import { GPSModule } from './gps/gps.module';
+import { APP_GUARD } from '@nestjs/core';
+import { RolesGuard } from './auth/guards/roles.guard';
+import { ShipmentGuard } from './auth/guards/shipment.guard';
 
 @Module({
   imports: [
@@ -30,6 +33,20 @@ import { GPSModule } from './gps/gps.module';
     ShipmentsModule,
     CarriersModule,
     GPSModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ShipmentGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
   ],
 })
 export class AppModule {}

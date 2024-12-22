@@ -23,4 +23,7 @@ export class IcpUser {
 
   @OneToMany(() => Shipment, (shipment) => shipment.shipper)
   shipments: Shipment[];
+
+  @OneToMany(() => Shipment, (shipment) => shipment.carrierPrincipal)
+  carriedShipments: Shipment[];
 }

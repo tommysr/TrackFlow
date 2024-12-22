@@ -42,6 +42,7 @@ export class AuthService {
 
       return icpUser;
     } catch (error) {
+      console.error('Error validating ICP payload:', error);
       throw new UnauthorizedException('Invalid ICP authentication');
     }
   }

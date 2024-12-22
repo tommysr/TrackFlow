@@ -9,11 +9,15 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { IcpStrategy } from './strategies/icp.strategy';
 import { IcpUser } from './entities/icp.user.entity';
 import { ChallengeService } from './services/challenge.service';
+import { ShipmentGuard } from './guards/shipment.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { ShipmentsModule } from 'src/shipments/shipments.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([IcpUser]),
     PassportModule,
+    ShipmentsModule,
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({
         secret: configService.get('JWT_SECRET'),
@@ -23,7 +27,7 @@ import { ChallengeService } from './services/challenge.service';
       imports: [ConfigModule],
     }),
   ],
-  providers: [AuthService, JwtStrategy, IcpStrategy, ChallengeService],
+  providers: [AuthService, JwtStrategy, IcpStrategy, ChallengeService, RolesGuard, ShipmentGuard],
   controllers: [AuthController],
   exports: [AuthService],
 })
