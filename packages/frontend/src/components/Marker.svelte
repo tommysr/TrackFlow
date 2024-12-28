@@ -6,7 +6,6 @@
 		location,
 		onClick
 	}: {
-		name: string;
 		location: Coords;
 		onClick: () => void;
 	} = $props();

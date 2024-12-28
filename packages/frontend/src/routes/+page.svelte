@@ -58,11 +58,10 @@
 />
 
 {#if !showAddModal}
-  {#each data.pendingShipments as { id, info }}
+  {#each data.pendingShipments as  { id, info } }
     <Marker
       onClick={() => selectShipment(id)}
       location={info.source}
-      name={id}
     />
   {/each}
 {/if}

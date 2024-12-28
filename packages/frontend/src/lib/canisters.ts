@@ -50,6 +50,7 @@ export const connect = async () => {
   let authClient = await AuthClient.create();
 
   // Get challenge and sessionId
+  // Get challenge and sessionId
   const challengeResponse = (await fetch(
     'http://localhost:5000/auth/challenge',
   ).then((res) => res.json())) as ChallengeResponse;
@@ -128,7 +129,7 @@ export const connect = async () => {
     },
   });
   
-  return { actor, identity, delegations, accessToken };
+  return { actor, identity, accessToken, delegations };
 };
 
 // Add helper function for authenticated requests

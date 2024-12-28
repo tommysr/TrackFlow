@@ -4,29 +4,45 @@
   import clsx from 'clsx';
   import type { PageData } from './$types';
   import type { ExtendedShipment } from '$src/lib/extended.shipment';
+  import Marker from '$components/Marker.svelte';
+  import { wallet } from '$src/lib/wallet.svelte';
+    import type { Shipment } from '../../../../../declarations/canister/canister.did';
 
   let { data }: { data: PageData } = $props();
 
   let isMobileOpen = $state(false);
-  let isWalletConnected = $state(true);
+  let isWalletConnected = $derived($wallet.connected);
   let selectedNav = $state(0);
+  let selected = $state<Shipment | null>(null);
 
-  const categories: { name: string, data: ExtendedShipment[], type: 'pending' | 'bought' | 'transit' }[] = [
+
+  function selectShipment(id: bigint) {
+    selected =
+      [...data.pendingShipments, ...data.created, ...data.carried].find(
+        (shipment) => shipment.id === id,
+      );
+  }
+
+  const categories: {
+    name: string;
+    data: ExtendedShipment[];
+    type: 'pending' | 'bought' | 'transit';
+  }[] = [
     {
       name: 'Pending',
       data: data.pendingShipments,
-      type: 'pending'
+      type: 'pending',
     },
     {
       name: 'Bought',
-      data: data.carried,
-      type: 'bought'
+      data: data.boughtShipments,
+      type: 'bought',
     },
     {
       name: 'In Transit',
-      data: data.created,
-      type: 'transit'
-    }
+      data: data.inTransitShipments,
+      type: 'transit',
+    },
   ];
 
   $inspect(data);
@@ -36,6 +52,12 @@
   <title>Shippers</title>
   <meta name="description" content="Svelte demo app" />
 </svelte:head>
+
+{#if isWalletConnected}
+  {#each categories[selectedNav].data as { id, info }}
+    <Marker onClick={() => selectShipment(id)} location={info.source} />
+  {/each}
+{/if}
 
 <ListWrapper bind:isMobileOpen>
   {#if !isWalletConnected}
@@ -72,9 +94,9 @@
           <ul class="w-full flex-1 space-y-4">
             {#each categories[selectedNav].data as shipment}
               <li>
-                <ShipmentCard 
-                  {shipment} 
-                  cardType={categories[selectedNav].type} 
+                <ShipmentCard
+                  {shipment}
+                  cardType={categories[selectedNav].type}
                 />
               </li>
             {/each}

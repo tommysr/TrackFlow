@@ -14,7 +14,7 @@ export let stateWallet: MaybeWallet = $state({
 });
 
 export interface Wallet {
-  connected: true;
+  connected: boolean;
   actor: ActorSubclass<_SERVICE>;
   identity: Identity;
   delegations: DelegationsWithUserKey;
