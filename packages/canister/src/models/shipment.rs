@@ -68,6 +68,7 @@ impl ShipmentInfo {
 #[derive(Deserialize, Serialize, Debug, Clone, CandidType, PartialEq, Eq)]
 pub enum ShipmentStatus {
     Pending,
+    Bought,
     InTransit,
     Delivered,
     Cancelled,

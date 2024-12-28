@@ -11,6 +11,12 @@ type Shipment = record {
   hashed_secret : text;
   carrier : opt principal;
 };
+type ShipmentEvent = variant {
+  Finalized : record { shipment_id : nat64; party : principal };
+  CarrierAssigned : record { shipment_id : nat64; carrier : principal };
+  Created : record { shipment_id : nat64 };
+  StatusUpdated : record { status : ShipmentStatus; shipment_id : nat64 };
+};
 type ShipmentInfo = record {
   destination : ShipmentLocation;
   value : nat64;
@@ -19,17 +25,31 @@ type ShipmentInfo = record {
   price : nat64;
 };
 type ShipmentLocation = record { lat : float64; lng : float64; street : text };
-type ShipmentStatus = variant { InTransit; Delivered; Cancelled; Pending };
+type ShipmentStatus = variant {
+  InTransit;
+  Delivered;
+  Bought;
+  Cancelled;
+  Pending;
+};
 type SizeCategory = variant {
   Parcel : record { max_height : nat64; max_width : nat64; max_depth : nat64 };
   Envelope;
+};
+type TimestampedEvent = record {
+  event : ShipmentEvent;
+  timestamp : nat64;
+  sequence : nat64;
 };
 service : () -> {
   buyShipment : (text, nat64) -> (Result);
   createShipment : (text, text, text, ShipmentInfo) -> (Result_1);
   finalizeShipment : (nat64, opt text) -> (Result);
+  getEvents : (opt nat64) -> (vec TimestampedEvent) query;
+  getShipment : (nat64) -> (opt Shipment) query;
   listPendingShipments : () -> (vec Shipment) query;
   listUserShipments : () -> (vec Shipment, vec Shipment) query;
+  purgeOldEvents : () -> (Result);
   roles : () -> (bool, bool) query;
   shipments : () -> (vec Shipment) query;
 }
