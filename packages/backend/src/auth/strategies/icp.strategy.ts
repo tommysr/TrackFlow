@@ -46,10 +46,10 @@ export class IcpStrategy extends PassportStrategy(Strategy, 'icp') {
       delegationsIdentity,
     } = req.body;
 
-    console.log('signature', signature);
-    console.log('publicKey', publicKey);
-    console.log('challenge', challenge);
-    console.log('sessionId', sessionId);
+    this.logger.log('signature', signature);
+    this.logger.log('publicKey', publicKey);
+    this.logger.log('challenge', challenge);
+    this.logger.log('sessionId', sessionId);
 
     if (!sessionId || !challenge || !signature || !publicKey) {
       this.logger.warn('Missing required authentication data');
@@ -95,10 +95,11 @@ export class IcpStrategy extends PassportStrategy(Strategy, 'icp') {
         rootKey: Buffer.from(rootKey, 'base64'),
       });
 
-      console.log(
-        'isValid',
-        Principal.selfAuthenticating(Buffer.from(userPublicKey)).toText(),
-      );
+      this.logger.log('isValid', isValid);
+      if (!isValid) {
+        throw new UnauthorizedException('Invalid delegation or signature');
+      }
+
       return {
         principal: Principal.selfAuthenticating(
           Buffer.from(userPublicKey),

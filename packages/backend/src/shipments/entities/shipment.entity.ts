@@ -27,7 +27,7 @@ export class Shipment {
   shipper: IcpUser;
 
   // If assigned to a carrier principal
-  @ManyToOne(() => IcpUser, { nullable: true })
+  @ManyToOne(() => IcpUser, (user) => user.carriedShipments, { nullable: true })
   carrierPrincipal: IcpUser;
 
   @ManyToOne(() => Carrier, { nullable: true })

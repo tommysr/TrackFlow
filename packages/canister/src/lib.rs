@@ -3,17 +3,63 @@ mod state;
 
 use anyhow::anyhow;
 use candid::Principal;
+use candid::{CandidType, Deserialize};
 use ic_cdk::{init, query, update};
 use models::{
     customer::Customer,
-    shipment::{Shipment, ShipmentInfo, ShipmentLocation, SizeCategory},
+    shipment::{Shipment, ShipmentInfo, ShipmentLocation, ShipmentStatus, SizeCategory},
     shipment_id::{ShipmentId, ShipmentIdInner},
 };
 use state::{CARRIERS, CUSTOMERS, SHIPMENTS};
+use std::collections::HashSet;
+use std::{cell::RefCell, collections::VecDeque};
+
+#[derive(CandidType, Deserialize, Clone)]
+pub enum ShipmentEvent {
+    Created {
+        shipment_id: ShipmentIdInner,
+    },
+    StatusUpdated {
+        shipment_id: ShipmentIdInner,
+        status: ShipmentStatus,
+    },
+    CarrierAssigned {
+        shipment_id: ShipmentIdInner,
+        carrier: Principal,
+    },
+    Finalized {
+        party: Principal,
+        shipment_id: ShipmentIdInner,
+    },
+}
+
+#[derive(CandidType, Deserialize, Clone)]
+pub struct TimestampedEvent {
+    pub event: ShipmentEvent,
+    pub timestamp: u64,
+    pub sequence: u64,
+}
+
+thread_local! {
+    static EVENTS: RefCell<VecDeque<TimestampedEvent>> = RefCell::new(VecDeque::new());
+    static LAST_SEQUENCE: RefCell<u64> = RefCell::new(0);
+    static ADMINS: RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
+}
+
+const MAX_EVENTS_AGE: u64 = 24 * 60 * 60; // 24 hours in seconds
+const MAX_EVENTS_SIZE: usize = 1000;
 
 fn check_anonymous(caller: Principal) -> Result<(), String> {
     if caller == Principal::anonymous() {
         return Err("Cannot be called anonymously".to_string());
+    }
+
+    Ok(())
+}
+
+fn check_admin(caller: Principal) -> Result<(), String> {
+    if !ADMINS.with_borrow(|admins| admins.contains(&caller)) {
+        return Err("Cannot be called by non-admins".to_string());
     }
 
     Ok(())
@@ -112,6 +158,13 @@ async fn finalize_shipment(
         })
         .map_err(|e: anyhow::Error| e.to_string())?;
 
+    if finalize_result.is_ok() {
+        add_event(ShipmentEvent::Finalized {
+            shipment_id,
+            party: caller,
+        });
+    }
+
     finalize_result.map_err(|e| e.to_string())
 }
 
@@ -133,6 +186,13 @@ async fn buy_shipment(carrier_name: String, shipment_id: ShipmentIdInner) -> Res
             })
         })
         .map_err(|e: anyhow::Error| e.to_string())?;
+
+    if buy_result.is_ok() {
+        add_event(ShipmentEvent::StatusUpdated {
+            shipment_id,
+            status: ShipmentStatus::Bought,
+        });
+    }
 
     buy_result.map_err(|e| e.to_string())
 }
@@ -159,6 +219,11 @@ async fn create_shipment(
             shipment_info,
         );
         SHIPMENTS.with_borrow_mut(|shipments| shipments.insert(inner_shipment_id, shipment));
+
+        add_event(ShipmentEvent::Created {
+            shipment_id: inner_shipment_id,
+        });
+
         inner_shipment_id
     });
 
@@ -190,6 +255,67 @@ fn roles() -> (bool, bool) {
 #[query]
 fn shipments() -> Vec<Shipment> {
     SHIPMENTS.with_borrow(|shipments| shipments.values().cloned().collect())
+}
+
+#[query(name = "getShipment")]
+fn get_shipment(shipment_id: ShipmentIdInner) -> Option<Shipment> {
+    SHIPMENTS.with_borrow(|shipments| shipments.get(&shipment_id).cloned())
+}
+
+fn add_event(event: ShipmentEvent) {
+    LAST_SEQUENCE.with(|seq| {
+        let next_seq = *seq.borrow() + 1;
+        *seq.borrow_mut() = next_seq;
+
+        let time_nanos = ic_cdk::api::time();
+        let timestamp = time_nanos / 1_000_000_000;
+        let timestamped = TimestampedEvent {
+            event,
+            timestamp,
+            sequence: next_seq,
+        };
+
+        EVENTS.with(|events| {
+            let mut events = events.borrow_mut();
+            events.push_back(timestamped);
+
+            // Maintain max size
+            while events.len() > MAX_EVENTS_SIZE {
+                events.pop_front();
+            }
+        });
+    });
+}
+
+#[query(name = "getEvents")]
+fn get_events(since_sequence: Option<u64>) -> Vec<TimestampedEvent> {
+    EVENTS.with(|events| {
+        events
+            .borrow()
+            .iter()
+            .filter(|e| match since_sequence {
+                Some(seq) => e.sequence > seq,
+                None => true,
+            })
+            .cloned()
+            .collect()
+    })
+}
+
+#[update(name = "purgeOldEvents")]
+fn purge_old_events() -> Result<(), String> {
+    check_admin(ic_cdk::caller())?;
+
+    let current_time = ic_cdk::api::time();
+    let current_time_secs = current_time / 1_000_000_000;
+
+    EVENTS.with(|events| {
+        events.borrow_mut().retain(|e| {
+            current_time_secs - e.timestamp < MAX_EVENTS_AGE
+        });
+    });
+
+    Ok(())
 }
 
 ic_cdk::export_candid!();

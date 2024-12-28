@@ -5,6 +5,7 @@ import { JwtPayload } from './strategies/jwt-payload.interface';
 import { JwtService } from '@nestjs/jwt';
 import { IcpPayload } from './strategies/icp-payload.interface';
 import { IcpUser, UserRole } from './entities/icp.user.entity';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
@@ -12,6 +13,7 @@ export class AuthService {
     @InjectRepository(IcpUser)
     private readonly icpUserRepository: Repository<IcpUser>,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async authorizeIcpSession(
@@ -23,7 +25,14 @@ export class AuthService {
       principal: icpUser.principal,
       role: icpUser.role,
     };
-    return { accessToken: this.jwtService.sign(jwtPayload) };
+    const options = {
+      secret: this.configService.get<string>('JWT_SECRET'),
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN'),
+    };
+
+
+    console.log('options', options);
+    return { accessToken: this.jwtService.sign(jwtPayload, options) };
   }
 
   async validateIcpPayload(icpPayload: IcpPayload): Promise<IcpUser> {
@@ -42,6 +51,7 @@ export class AuthService {
 
       return icpUser;
     } catch (error) {
+      console.error('Error validating ICP payload:', error);
       throw new UnauthorizedException('Invalid ICP authentication');
     }
   }

@@ -2,7 +2,7 @@
   import CreateShipmentForm from '$components/CreateShipmentForm.svelte';
   import { wallet } from '$lib/wallet.svelte';
   import { Plus } from 'lucide-svelte';
-  import type { PageData } from './$types';
+  import type { LayoutData, PageData } from './$types';
   import Marker from '$components/Marker.svelte';
   import type { Shipment } from '../../../declarations/canister/canister.did';
   import Modal from '$components/Modal.svelte';
@@ -18,7 +18,7 @@
   const {
     data,
   }: {
-    data: PageData;
+    data: LayoutData;
   } = $props();
 
   function selectShipment(id: bigint) {

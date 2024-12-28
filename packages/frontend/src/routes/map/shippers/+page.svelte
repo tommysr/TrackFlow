@@ -1,25 +1,35 @@
-<script>
+<script lang="ts">
   import ListWrapper from '$components/ListWrapper.svelte';
+  import ShipmentCard from '$components/ShipmentCard.svelte';
   import clsx from 'clsx';
+  import type { PageData } from './$types';
+  import type { ExtendedShipment } from '$src/lib/extended.shipment';
+
+  let { data }: { data: PageData } = $props();
 
   let isMobileOpen = $state(false);
   let isWalletConnected = $state(true);
   let selectedNav = $state(0);
 
-  const insideNavData = [
+  const categories: { name: string, data: ExtendedShipment[], type: 'pending' | 'bought' | 'transit' }[] = [
     {
       name: 'Pending',
-      data: [1, 2, 3],
+      data: data.pendingShipments,
+      type: 'pending'
     },
     {
       name: 'Bought',
-      data: [1, 2, 3],
+      data: data.carried,
+      type: 'bought'
     },
     {
       name: 'In Transit',
-      data: [1, 2, 3],
-    },
+      data: data.created,
+      type: 'transit'
+    }
   ];
+
+  $inspect(data);
 </script>
 
 <svelte:head>
@@ -39,7 +49,7 @@
   {:else}
     <div class="h-full flex w-full flex-col items-center">
       <div class="inline-flex shadow-sm rounded-lg m-4 flex-none">
-        {#each insideNavData as { name }, i}
+        {#each categories as { name }, i}
           <button
             aria-current="page"
             class={clsx(
@@ -48,7 +58,7 @@
                 ? 'bg-gradient-to-r from-primary-400 to-secondary-400 text-white'
                 : 'bg-gradient-to-r from-primary-400 to-secondary-400 bg-clip-text text-transparent',
               i == 0 && 'rounded-l-lg',
-              i == insideNavData.length - 1 && 'rounded-r-lg',
+              i == categories.length - 1 && 'rounded-r-lg',
             )}
             onclick={() => (selectedNav = i)}
           >
@@ -57,11 +67,16 @@
         {/each}
       </div>
 
-      {#if insideNavData[selectedNav] && insideNavData[selectedNav].data.length != 0}
+      {#if categories[selectedNav].data.length > 0}
         <div class="flex-1 flex w-full flex-col overflow-y-auto px-4 mt-5">
           <ul class="w-full flex-1 space-y-4">
-            {#each insideNavData[selectedNav].data as item}
-              <li>{item}</li>
+            {#each categories[selectedNav].data as shipment}
+              <li>
+                <ShipmentCard 
+                  {shipment} 
+                  cardType={categories[selectedNav].type} 
+                />
+              </li>
             {/each}
           </ul>
         </div>
@@ -70,7 +85,7 @@
           <p
             class="mb-5 text-center text-xl bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent"
           >
-            Nothing found
+            No shipments found
           </p>
         </div>
       {/if}
