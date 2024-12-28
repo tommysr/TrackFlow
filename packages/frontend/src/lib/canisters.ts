@@ -31,12 +31,6 @@ export const anonymousBackend = createActor(canisterId, {
   agentOptions: { host },
 });
 
-interface AuthenticatedClient {
-  actor: any;
-  identity: DelegationIdentity;
-  delegations: DelegationsWithUserKey;
-  challenge?: ArrayBuffer;
-}
 
 interface ChallengeResponse {
   sessionId: string;
@@ -44,16 +38,13 @@ interface ChallengeResponse {
 }
 
 // For local development, use this root key
-const LOCAL_DFINITY_ROOT_KEY = new Uint8Array([
-  48, 129, 130, 48, 29, 6, 13, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 1, 2, 1, 6,
-  12, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 2, 1, 3, 97, 0, 151, 183, 101, 249,
-  109, 236, 192, 193, 183, 2, 241, 182, 159, 111, 224, 58, 13, 161, 175, 115,
-  202, 140, 247, 156, 56, 96, 193, 209, 109, 72, 130, 105, 189, 229, 214, 182,
-  133, 115, 181, 1, 197, 167, 187, 142, 140, 112, 62, 141, 9, 126, 78, 94, 186,
-  87, 52, 154, 141, 82, 186, 151, 124, 250, 56, 129, 222, 222, 136, 98, 154,
-  227, 114, 244, 83, 104, 57, 9, 81, 142, 67, 167, 36, 193, 202, 155, 85, 77,
-  46, 252, 161, 184, 101, 33, 78, 198, 33, 192,
-]);
+const LOCAL_DFINITY_ROOT_KEY = new Uint8Array([48, 129, 130, 48, 29, 6, 13, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 1, 2, 1, 6, 12, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 2, 1, 3, 97, 0, 143, 15, 57, 247, 175, 198, 74, 135, 233, 86, 41, 30, 247, 27, 5, 253, 68, 141, 5, 14, 191, 204, 196, 89, 236, 198, 243, 62, 88, 246, 135, 107, 202, 182, 49, 42, 135, 31, 112, 8, 29, 118, 43, 114, 60, 148, 225, 199, 11, 235, 98, 207, 85, 74, 39, 159, 187, 234, 103, 87, 196, 15, 92, 53, 189, 150, 195, 9, 93, 189, 238, 16, 190, 35, 70, 9, 95, 58, 228, 199, 51, 145, 19, 101, 184, 38, 238, 142, 69, 83, 86, 119, 31, 194, 111, 238]
+);
+
+// Add function to get stored token
+export const getStoredToken = () => {
+  return localStorage.getItem('api_token');
+};
 
 export const connect = async () => {
   let authClient = await AuthClient.create();
@@ -121,11 +112,13 @@ export const connect = async () => {
     }),
   });
 
-  console.log('response', response);
 
   if (!response.ok) {
     throw new Error('Authentication failed');
   }
+
+  const { accessToken } = await response.json();
+  localStorage.setItem('api_token', accessToken);
 
   // Create actor with authenticated identity
   const actor = createActor(canisterId, {
@@ -134,8 +127,25 @@ export const connect = async () => {
       host,
     },
   });
+  
+  return { actor, identity, delegations, accessToken };
+};
 
-  return { actor, identity, delegations };
+// Add helper function for authenticated requests
+export const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
+  const token = getStoredToken();
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
 };
 
 export const contractCanister = canisterIds.frontend.local;
