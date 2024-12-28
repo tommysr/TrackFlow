@@ -27,7 +27,7 @@ import { ShipmentsModule } from 'src/shipments/shipments.module';
       imports: [ConfigModule],
     }),
   ],
-  providers: [AuthService, JwtStrategy, IcpStrategy, ChallengeService, RolesGuard, ShipmentGuard],
+  providers: [AuthService, JwtStrategy, IcpStrategy, ChallengeService],
   controllers: [AuthController],
   exports: [AuthService],
 })
