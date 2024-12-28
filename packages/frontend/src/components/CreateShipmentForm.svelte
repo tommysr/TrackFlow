@@ -3,6 +3,10 @@
   import DecimalInput from './DecimalInput.svelte';
   import TextInput from './TextInput.svelte';
   import Modal from './Modal.svelte';
+    import { wallet } from '$src/lib/wallet.svelte';
+    import { sha256 } from 'js-sha256';
+    import { getLocalStorage, setLocalStorage } from '$src/lib/storage';
+    import { invalidateAll } from '$app/navigation';
 
   interface ShipmentProps {
     showModal: boolean;
@@ -24,7 +28,54 @@
   let isSelectMode = $state(false);
   let selectModeType: 'source' | 'destination' = $state('source');
 
-  const createShipment = async (e: Event) => {};
+  const createShipment = async (e: Event) => {
+		e.preventDefault();
+
+		if (!$wallet.connected) await wallet.connect();
+		if (!$wallet.connected) return;
+
+		const priceBigint = BigInt(price);
+
+		const secret = 'secret';
+
+		const hash = sha256.create();
+		hash.update(secret);
+		const hashed = hash.hex();
+
+		const res = await $wallet.actor.createShipment(
+			'',
+			name,
+			hashed,
+			{
+				size_category:
+					size_category == 'Parcel'
+						? {
+								Parcel: {
+									max_height: BigInt(max_height),
+									max_width: BigInt(max_width),
+									max_depth: BigInt(max_depth)
+								}
+							}
+						: { Envelope: null },
+				destination,
+				source,
+				price: priceBigint,
+				value: BigInt(value)
+			}
+		);
+
+		if (Object.keys(res)[0] === 'Ok') {
+			const id: bigint = (res as { Ok: bigint }).Ok;
+			setLocalStorage(id.toString(), secret);
+			const loadedDone = getLocalStorage('done', secret);
+			console.log('loadedDone', loadedDone);
+		}
+
+		console.log('createShipment', res);
+
+		onClose();
+		invalidateAll();
+	};
 
   function getLocation(e: CustomEvent<maplibregl.MapMouseEvent>) {
     const { lng, lat } = e.detail.lngLat;
