@@ -6,7 +6,7 @@ import { anonymousBackend } from '$lib/canisters';
 import { stateWallet, wallet } from '$lib/wallet.svelte';
 import type { LoadEvent } from '@sveltejs/kit';
 
-/** @type {import('./$types').PageLoad } */
+/** @type {import('./$types').LayoutLoad } */
 export async function load({ url }: LoadEvent): Promise<{
 	pendingShipments: Shipment[];
 	carried: Shipment[];

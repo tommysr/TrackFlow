@@ -3,7 +3,7 @@
   import ShipmentCard from '$components/ShipmentCard.svelte';
   import clsx from 'clsx';
   import type { PageData } from './$types';
-    import type { ExtendedShipment } from '$src/lib/extended.shipment';
+  import type { ExtendedShipment } from '$src/lib/extended.shipment';
 
   let { data }: { data: PageData } = $props();
 
@@ -19,15 +19,17 @@
     },
     {
       name: 'Bought',
-      data: data.boughtShipments,
+      data: data.carried,
       type: 'bought'
     },
     {
       name: 'In Transit',
-      data: data.inTransitShipments,
+      data: data.created,
       type: 'transit'
     }
   ];
+
+  $inspect(data);
 </script>
 
 <svelte:head>
