@@ -6,6 +6,7 @@ import {
   Body,
   UseGuards,
   Request,
+  Logger,
 } from '@nestjs/common';
 import { ShipmentsService } from './shipments.service';
 import { Shipment } from './entities/shipment.entity';
@@ -17,16 +18,19 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { User } from 'src/auth/decorators/user.decorator';
+import { ShipmentResponseDto } from './dto/shipment-response.dto';
 
 @Controller('shipments')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 export class ShipmentsController {
+  private readonly logger = new Logger(ShipmentsController.name);
+
   constructor(private readonly shipmentsService: ShipmentsService) {}
 
   // Shipper retrieves their shipments
   @Get('my-shipments')
-  @Roles(UserRole.SHIPPER, UserRole.ADMIN)
-  async getMyShipments(@User() user: IcpUser): Promise<Shipment[]> {
+  // @Roles(UserRole.SHIPPER)
+  async getMyShipments(@User() user: { principal: string }): Promise<ShipmentResponseDto[]> {
     return this.shipmentsService.findByShipper(user.principal);
   }
 
