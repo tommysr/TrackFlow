@@ -3,10 +3,10 @@
   import DecimalInput from './DecimalInput.svelte';
   import TextInput from './TextInput.svelte';
   import Modal from './Modal.svelte';
-    import { wallet } from '$src/lib/wallet.svelte';
-    import { sha256 } from 'js-sha256';
-    import { getLocalStorage, setLocalStorage } from '$src/lib/storage';
-    import { invalidateAll } from '$app/navigation';
+  import { wallet } from '$src/lib/wallet.svelte';
+  import { sha256 } from 'js-sha256';
+  import { getLocalStorage, setLocalStorage } from '$src/lib/storage';
+  import { invalidateAll } from '$app/navigation';
 
   interface ShipmentProps {
     showModal: boolean;
@@ -28,54 +28,66 @@
   let isSelectMode = $state(false);
   let selectModeType: 'source' | 'destination' = $state('source');
 
+  let error: string | null = $state(null);
+
+  const generateRandomSecret = () => {
+    const secret = crypto.getRandomValues(new Uint8Array(32));
+    const secretHex = Array.from(secret).map(byte => byte.toString(16).padStart(2, '0')).join('');
+    return secretHex;
+  };
+
   const createShipment = async (e: Event) => {
-		e.preventDefault();
+    e.preventDefault();
+    error = null;
 
-		if (!$wallet.connected) await wallet.connect();
-		if (!$wallet.connected) return;
+    if (!$wallet.connected) await wallet.connect();
+    if (!$wallet.connected) return;
 
-		const priceBigint = BigInt(price);
+    try {
+      const priceBigint = BigInt(price);
 
-		const secret = 'secret';
+      const secret = generateRandomSecret();
 
-		const hash = sha256.create();
-		hash.update(secret);
-		const hashed = hash.hex();
+      const hash = sha256.create();
+      hash.update(secret);
+      const hashed = hash.hex();
 
-		const res = await $wallet.actor.createShipment(
-			'',
-			name,
-			hashed,
-			{
-				size_category:
-					size_category == 'Parcel'
-						? {
-								Parcel: {
-									max_height: BigInt(max_height),
-									max_width: BigInt(max_width),
-									max_depth: BigInt(max_depth)
-								}
-							}
-						: { Envelope: null },
-				destination,
-				source,
-				price: priceBigint,
-				value: BigInt(value)
-			}
-		);
+      const res = await $wallet.actor.createShipment('', name, hashed, {
+        size_category:
+          size_category == 'Parcel'
+            ? {
+                Parcel: {
+                  max_height: BigInt(max_height),
+                  max_width: BigInt(max_width),
+                  max_depth: BigInt(max_depth),
+                },
+              }
+            : { Envelope: null },
+        destination,
+        source,
+        price: priceBigint,
+        value: BigInt(value),
+      });
 
-		if (Object.keys(res)[0] === 'Ok') {
-			const id: bigint = (res as { Ok: bigint }).Ok;
-			setLocalStorage(id.toString(), secret);
-			const loadedDone = getLocalStorage('done', secret);
-			console.log('loadedDone', loadedDone);
-		}
 
-		console.log('createShipment', res);
+      if (Object.keys(res)[0] === 'Ok') {
+        const id = (res as { Ok: bigint }).Ok;
+        setLocalStorage(id.toString(), secret);
+        const loadedDone = getLocalStorage('done', secret);
+        console.log('loadedDone', loadedDone);
+      } else {
+        console.error('Failed to create shipment', res);
+        return;
+      }
 
-		onClose();
-		invalidateAll();
-	};
+      console.log('createShipment', res);
+
+      onClose();
+      await invalidateAll();
+    } catch (e: any) {
+      error = e.message || 'Failed to create shipment';
+    }
+  };
 
   function getLocation(e: CustomEvent<maplibregl.MapMouseEvent>) {
     const { lng, lat } = e.detail.lngLat;
@@ -242,4 +254,10 @@
   <Marker lngLat={[destination.lng, destination.lat]}>
     <div class="pin bounce-a cursor-pointer active"></div>
   </Marker>
+{/if}
+
+{#if error}
+  <div class="mt-4 p-4 bg-red-50 rounded-lg">
+    <p class="text-red-700">{error}</p>
+  </div>
 {/if}
