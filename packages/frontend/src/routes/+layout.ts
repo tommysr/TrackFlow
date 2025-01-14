@@ -12,7 +12,7 @@ export async function load({ url }: LoadEvent): Promise<{
 	carried: Shipment[];
 	created: Shipment[];
 }> {
-	const pendingShipments = await anonymousBackend.listPendingShipments();
+	let pendingShipments = await anonymousBackend.listPendingShipments();
 
 	let carried: Shipment[] = [];
 	let created: Shipment[] = [];
@@ -21,6 +21,11 @@ export async function load({ url }: LoadEvent): Promise<{
 		let [car, cus] = await stateWallet.actor.listUserShipments();
 		carried = car;
 		created = cus;
+
+	}
+
+	if (stateWallet.connected) {
+		pendingShipments = pendingShipments.filter(shipment => stateWallet.identity?.getPrincipal().compareTo(shipment.customer) != 'eq');
 	}
 
 	console.log('pendingShipments:', pendingShipments);
