@@ -188,9 +188,9 @@ async fn buy_shipment(carrier_name: String, shipment_id: ShipmentIdInner) -> Res
         .map_err(|e: anyhow::Error| e.to_string())?;
 
     if buy_result.is_ok() {
-        add_event(ShipmentEvent::StatusUpdated {
+        add_event(ShipmentEvent::CarrierAssigned {
             shipment_id,
-            status: ShipmentStatus::Bought,
+            carrier: carrier_id,
         });
     }
 
