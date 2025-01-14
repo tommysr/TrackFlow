@@ -32,7 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       where: { principal: payload.principal },
     });
 
-    this.logger.log('JWT Strategy - found user:', user);
+    this.logger.log('JWT Strategy - found user:', user.principal);
 
     if (!user) {
       this.logger.error('JWT Strategy - User not found for principal:', payload.principal);

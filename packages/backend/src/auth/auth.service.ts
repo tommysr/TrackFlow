@@ -44,7 +44,7 @@ export class AuthService {
       if (!icpUser) {
         icpUser = this.icpUserRepository.create({
           principal: icpPayload.principal,
-          role: UserRole.UNKNOWN,
+          role: UserRole.USER,
         });
         await this.icpUserRepository.save(icpUser);
       }
