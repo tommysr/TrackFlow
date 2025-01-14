@@ -5,20 +5,21 @@ import {
   Param,
   Body,
   UseGuards,
-  Request,
   Logger,
 } from '@nestjs/common';
 import { ShipmentsService } from './shipments.service';
-import { Shipment } from './entities/shipment.entity';
-import { RolesGuard } from '../auth/guards/roles.guard';
+
 import { ShipmentGuard } from '../auth/guards/shipment.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { IcpUser, UserRole } from '../auth/entities/icp.user.entity';
-import { UpdateStatusDto } from './dto/update-status.dto';
-import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { User } from 'src/auth/decorators/user.decorator';
-import { ShipmentResponseDto } from './dto/shipment-response.dto';
+import {
+  BoughtShipmentResponseDto,
+  PendingShipmentResponseDto,
+} from './dto/shipment-response.dto';
+import { CreateShipmentDto } from './dto/create-shipment.dto';
+import { ShipmentSyncGuard } from 'src/auth/guards/shipment.sync.guard';
 
 @Controller('shipments')
 @UseGuards(JwtAuthGuard)
@@ -27,29 +28,42 @@ export class ShipmentsController {
 
   constructor(private readonly shipmentsService: ShipmentsService) {}
 
-  // Shipper retrieves their shipments
-  @Get('my-shipments')
-  // @Roles(UserRole.SHIPPER)
-  async getMyShipments(@User() user: { principal: string }): Promise<ShipmentResponseDto[]> {
-    return this.shipmentsService.findByShipper(user.principal);
-  }
-
-  // Carrier retrieves their assigned shipments
-  @Get('assigned-shipments')
-  @Roles(UserRole.CARRIER, UserRole.ADMIN)
-  async getAssignedShipments(@User() user: IcpUser): Promise<Shipment[]> {
-    return this.shipmentsService.findByCarrier(user.principal);
-  }
-
-  // Update shipment status (only carrier or admin)
-  @Post(':id/status')
+  // Create a shipment, only shipper
+  @Post('create')
+  @Roles(UserRole.SHIPPER)
+  @UseGuards(ShipmentSyncGuard)
   @UseGuards(ShipmentGuard)
-  @Roles(UserRole.CARRIER, UserRole.ADMIN)
-  async updateShipmentStatus(
-    @Param('id') id: string,
-    @Body() updateStatusDto: UpdateStatusDto,
-  ): Promise<Shipment> {
-    // Optionally, you can re-validate ownership here if necessary
-    return this.shipmentsService.updateStatus(id, updateStatusDto);
+  async createShipment(
+    @Body() createShipmentDto: CreateShipmentDto,
+  ): Promise<{ trackingToken: string }> {
+    return this.shipmentsService.createShipment(createShipmentDto);
+  }
+
+  @Post(':id/ready-for-pickup')
+  @Roles(UserRole.SHIPPER)
+  @UseGuards(ShipmentSyncGuard)
+  @UseGuards(ShipmentGuard)
+  async markReadyForPickup(
+    @Param('id') id: number,
+    @User() user: IcpUser,
+  ): Promise<boolean> {
+    return this.shipmentsService.markReadyForPickup(id, user.principal);
+  }
+
+  @Get('my-pending')
+  @UseGuards(ShipmentSyncGuard)
+  async getShipperPendingShipments(
+    @User() user: IcpUser,
+  ): Promise<PendingShipmentResponseDto[]> {
+    return this.shipmentsService.findShipperPendingShipments(user.principal);
+  }
+
+  // Tab 2: Bought shipments with proposed dates
+  @Get('my-bought')
+  @UseGuards(ShipmentSyncGuard)
+  async getMyBoughtShipments(
+    @User() user: IcpUser,
+  ): Promise<BoughtShipmentResponseDto[]> {
+    return this.shipmentsService.findBoughtShipments(user.principal);
   }
 }

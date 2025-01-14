@@ -1,7 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, UpdateDateColumn, CreateDateColumn, JoinColumn, OneToOne, PrimaryColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, UpdateDateColumn, CreateDateColumn, JoinColumn, OneToOne, PrimaryColumn } from 'typeorm';
 import { Carrier } from 'src/carriers/entities/carrier.entity';
 import { Address } from './address.entity';
-import { Route } from 'src/aggregation/entities/route.entity';
 import { Shipper } from 'src/auth/entities/shipper.entity';
 
 export enum ShipmentStatus {
