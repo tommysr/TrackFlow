@@ -66,4 +66,26 @@ export class ShipmentsController {
   ): Promise<BoughtShipmentResponseDto[]> {
     return this.shipmentsService.findBoughtShipments(user.principal);
   }
+
+    // Set Pickup Date
+  @Post(':id/pickup-date')
+  @Roles(UserRole.CARRIER, UserRole.ADMIN)
+  @UseGuards(ShipmentGuard)
+  async setPickupDate(
+    @Param('id') id: number,
+    @Body() { pickupDate }: { pickupDate: Date },
+  ): Promise<boolean> {
+    return this.shipmentsService.setPickupDate(id, pickupDate);
+  }
+
+  // Set Delivery Date
+  @Post(':id/delivery-date')
+  @Roles(UserRole.CARRIER, UserRole.ADMIN)
+  @UseGuards(ShipmentGuard)
+  async setDeliveryDate(
+    @Param('id') id: number,
+    @Body() { deliveryDate }: { deliveryDate: Date },
+  ): Promise<boolean> {
+    return this.shipmentsService.setDeliveryDate(id, deliveryDate);
+  }
 }

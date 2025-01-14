@@ -10,7 +10,7 @@ import { Shipment, ShipmentStatus } from './entities/shipment.entity';
 import {
   AddressLocationResponseDto,
   BaseShipmentResponseDto,
-  BoughtShipmentResponseDto,  
+  BoughtShipmentResponseDto,
   PendingShipmentResponseDto,
 } from './dto/shipment-response.dto';
 import { ShipmentsSyncService } from './shipments-sync.service';
@@ -19,7 +19,6 @@ import { geocodeAddress } from '../utils/geocode.util';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
 import { Address } from './entities/address.entity';
-
 
 @Injectable()
 export class ShipmentsService {
@@ -139,11 +138,9 @@ export class ShipmentsService {
     return jwt.sign(payload, this.configService.get('TRACKING_TOKEN_SECRET'));
   }
 
-
   async findByHashedSecret(hashedSecret: string): Promise<Shipment | null> {
     return this.shipmentRepository.findOne({ where: { hashedSecret } });
   }
-
 
   private toBaseShipmentResponseDto(
     shipment: Shipment,
@@ -192,7 +189,7 @@ export class ShipmentsService {
         status: In([
           ShipmentStatus.PENDING_WITH_ADDRESS,
           ShipmentStatus.PENDING_NO_ADDRESS,
-          ShipmentStatus.BOUGHT_NO_ADDRESS
+          ShipmentStatus.BOUGHT_NO_ADDRESS,
         ]),
       },
       relations: [
@@ -217,7 +214,10 @@ export class ShipmentsService {
     const shipments = await this.shipmentRepository.find({
       where: {
         shipper: { identity: { principal } },
-        status: In([ShipmentStatus.BOUGHT_WITH_ADDRESS, ShipmentStatus.READY_FOR_PICKUP]),
+        status: In([
+          ShipmentStatus.BOUGHT_WITH_ADDRESS,
+          ShipmentStatus.READY_FOR_PICKUP,
+        ]),
       },
       relations: [
         'shipper',
@@ -269,12 +269,63 @@ export class ShipmentsService {
     }
 
     if (shipment.status !== ShipmentStatus.BOUGHT_WITH_ADDRESS) {
-      throw new BadRequestException('Shipment must be in BOUGHT_WITH_ADDRESS status');
+      throw new BadRequestException(
+        'Shipment must be in BOUGHT_WITH_ADDRESS status',
+      );
     }
 
     shipment.status = ShipmentStatus.READY_FOR_PICKUP;
     await this.shipmentRepository.save(shipment);
 
+    return true;
+  }
+
+  // Set Pickup Date, only carrier or admin
+  async setPickupDate(id: number, pickupDate: Date): Promise<boolean> {
+    const shipment = await this.findOneById(id);
+
+    if (
+      !shipment.pickupAddress ||
+      !shipment.pickupAddress.latitude ||
+      !shipment.pickupAddress.longitude
+    ) {
+      throw new BadRequestException(
+        'Cannot set pickup date without a complete pickup address',
+      );
+    }
+
+    if (shipment.status !== ShipmentStatus.READY_FOR_PICKUP) {
+      throw new BadRequestException(
+        'Cannot set pickup date for this shipment status',
+      );
+    }
+
+    shipment.pickupDate = pickupDate;
+    await this.shipmentRepository.save(shipment);
+    return true;
+  }
+
+  // Set Delivery Date
+  async setDeliveryDate(id: number, deliveryDate: Date): Promise<boolean> {
+    const shipment = await this.findOneById(id);
+
+    if (
+      !shipment.deliveryAddress ||
+      !shipment.deliveryAddress.latitude ||
+      !shipment.deliveryAddress.longitude
+    ) {
+      throw new BadRequestException(
+        'Cannot set delivery date without a complete delivery address',
+      );
+    }
+
+    if (shipment.status !== ShipmentStatus.IN_TRANSIT) {
+      throw new BadRequestException(
+        'Cannot set delivery date for this shipment status',
+      );
+    }
+    shipment.deliveryDate = deliveryDate;
+    await this.shipmentRepository.save(shipment);
     return true;
   }
 }
