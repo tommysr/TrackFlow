@@ -3,29 +3,45 @@
   import ShipmentCard from '$components/ShipmentCard.svelte';
   import clsx from 'clsx';
   import type { PageData } from './$types';
-  import type { ExtendedShipment } from '$src/lib/extended.shipment';
+  import {
+    isBoughtShipment,
+    isPendingShipment,
+    type BoughtShipment,
+    type InTransitShipment,
+    type PendingShipment,
+  } from '$src/lib/extended.shipment';
   import Marker from '$components/Marker.svelte';
   import { wallet } from '$src/lib/wallet.svelte';
-    import type { Shipment } from '../../../../../declarations/canister/canister.did';
+  import type { Shipment } from '../../../../../declarations/canister/canister.did';
+  import AddressForm from '$components/AddressForm.svelte';
+  import Modal from '$components/Modal.svelte';
+  import { authenticatedFetch } from '$src/lib/canisters';
+  import { invalidateAll } from '$app/navigation';
+
+  interface TrackingInfo {
+    secret: string;
+    trackingLink: string;
+  }
 
   let { data }: { data: PageData } = $props();
 
   let isMobileOpen = $state(false);
   let isWalletConnected = $derived($wallet.connected);
   let selectedNav = $state(0);
-  let selected = $state<Shipment | null>(null);
+  let showAddressModal = $state(false);
+  let selectedShipment = $state<PendingShipment | null>(null);
+  let isLoading = $state(false);
+  let error: string | null = $state(null);
 
-
-  function selectShipment(id: bigint) {
-    selected =
-      [...data.pendingShipments, ...data.created, ...data.carried].find(
-        (shipment) => shipment.id === id,
-      );
+  function selectShipment(
+    shipment: PendingShipment | BoughtShipment | InTransitShipment,
+  ) {
+    selectedShipment = shipment;
   }
 
   const categories: {
     name: string;
-    data: ExtendedShipment[];
+    data: PendingShipment[] | BoughtShipment[] | InTransitShipment[];
     type: 'pending' | 'bought' | 'transit';
   }[] = [
     {
@@ -45,6 +61,39 @@
     },
   ];
 
+  function openAddressModal(shipment: PendingShipment) {
+    selectedShipment = shipment;
+    showAddressModal = true;
+  }
+
+  function copyTrackingLink(shipment: PendingShipment) {
+    const trackingLink = `${window.location.origin}/map/track/${shipment.trackingToken || ''}`;
+    navigator.clipboard.writeText(trackingLink);
+  }
+
+  async function markReadyForPickup(shipment: BoughtShipment) {
+    isLoading = true;
+    error = null;
+
+    try {
+      const response = await authenticatedFetch(
+        `http://localhost:5000/shipments/${shipment.id}/ready-for-pickup`,
+        { method: 'POST' },
+      );
+
+      if (response.ok) {
+        await invalidateAll();
+      } else {
+        const errorData = await response.json();
+        error = errorData.message || 'Failed to mark as ready for pickup';
+      }
+    } catch (e: any) {
+      error = e.message || 'Failed to mark as ready for pickup';
+    } finally {
+      isLoading = false;
+    }
+  }
+
   $inspect(data);
 </script>
 
@@ -54,8 +103,11 @@
 </svelte:head>
 
 {#if isWalletConnected}
-  {#each categories[selectedNav].data as { id, info }}
-    <Marker onClick={() => selectShipment(id)} location={info.source} />
+  {#each categories[selectedNav].data as shipment}
+    <Marker
+      onClick={() => selectShipment(shipment)}
+      location={shipment.info.source}
+    />
   {/each}
 {/if}
 
@@ -94,10 +146,54 @@
           <ul class="w-full flex-1 space-y-4">
             {#each categories[selectedNav].data as shipment}
               <li>
-                <ShipmentCard
-                  {shipment}
-                  cardType={categories[selectedNav].type}
-                />
+                <ShipmentCard {shipment}>
+                  {#if isBoughtShipment(shipment)}
+                    <div class="flex mt-4 gap-5 justify-center">
+                      <button
+                        class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full disabled:opacity-50"
+                        onclick={() => copyTrackingLink(shipment)}
+                      >
+                        Copy Tracking Link
+                      </button>
+                      {#if shipment.status == 'BOUGHT_WITH_ADDRESS'}
+                        <button
+                          class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full disabled:opacity-50"
+                          onclick={() =>
+                            markReadyForPickup(shipment as BoughtShipment)}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? 'Marking...' : 'Mark Ready for Pickup'}
+                        </button>
+                      {/if}
+                    </div>
+
+                    {#if error}
+                      <div
+                        class="mt-2 p-2 bg-red-50 rounded text-red-700 text-sm"
+                      >
+                        {error}
+                      </div>
+                    {/if}
+                  {:else if isPendingShipment(shipment)}
+                    <div class="flex mt-4 gap-5 justify-center">
+                      {#if shipment.trackingToken}
+                        <button
+                          class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full disabled:opacity-50"
+                          onclick={() => copyTrackingLink(shipment)}
+                        >
+                          Copy Tracking Link
+                        </button>
+                      {:else}
+                        <button
+                          class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full disabled:opacity-50"
+                          onclick={() => openAddressModal(shipment)}
+                        >
+                          Set Address
+                        </button>
+                      {/if}
+                    </div>
+                  {/if}
+                </ShipmentCard>
               </li>
             {/each}
           </ul>
@@ -114,3 +210,25 @@
     </div>
   {/if}
 </ListWrapper>
+
+{#if showAddressModal && selectedShipment}
+  <Modal
+    bind:showModal={showAddressModal}
+    onClose={() => (showAddressModal = false)}
+  >
+    <AddressForm
+      shipment={selectedShipment}
+      bind:showModal={showAddressModal}
+      onClose={() => (showAddressModal = false)}
+    />
+  </Modal>
+{/if}
+
+{#if !showAddressModal}
+  {#each categories[selectedNav].data as shipment}
+    <Marker
+      onClick={() => selectShipment(shipment)}
+      location={shipment.info.source}
+    />
+  {/each}
+{/if}
