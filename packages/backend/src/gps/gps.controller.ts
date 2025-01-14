@@ -9,12 +9,4 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagg
 export class GPSController {
   constructor(private readonly gpsService: GPSService) {}
 
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @Post('update')
-  @ApiOperation({ summary: 'Update GPS data' })
-  @ApiResponse({ status: 201, description: 'GPS data updated successfully.' })
-  async updateGPS(@Body() createGPSDataDto: CreateGPSDataDto) {
-    return this.gpsService.handleGPSUpdate(createGPSDataDto);
-  }
 }
