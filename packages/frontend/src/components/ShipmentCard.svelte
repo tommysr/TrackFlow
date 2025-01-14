@@ -1,15 +1,43 @@
 <script lang="ts">
-  import type { ExtendedShipment } from '$lib/extended.shipment';
+  import {
+    isBoughtShipment,
+    isInTransitShipment,
+    isPendingShipment,
+    type AddressLocationResponse,
+    type AddressResponse,
+    type BoughtShipment,
+    type InTransitShipment,
+    type LocationResponse,
+    type PendingShipment,
+    type BackendStatus,
+  } from '$lib/extended.shipment';
   import { formatDistance } from 'date-fns';
+  import { authenticatedFetch } from '$lib/canisters';
+  import { invalidateAll } from '$app/navigation';
+  import type { Snippet } from 'svelte';
 
-
-  let { shipment, cardType }: { shipment: ExtendedShipment, cardType: 'pending' | 'bought' | 'transit' } = $props();
+  let {
+    shipment,
+    children,
+  }: {
+    shipment: PendingShipment | BoughtShipment | InTransitShipment;
+    children: Snippet;
+  } = $props();
 
   let isToday = $derived((date?: Date) => {
     if (!date) return false;
     const today = new Date();
     return date.toDateString() === today.toDateString();
   });
+
+
+  const formatLocation = (addressLocation: AddressLocationResponse) => {
+    if (addressLocation.isComplete) {
+      return `${addressLocation.address?.street}, ${addressLocation.address?.city}`;
+    }
+    return `Approx. (${addressLocation.location.lat.toFixed(4)}, ${addressLocation.location.lng.toFixed(4)})`;
+  };
+
 </script>
 
 <div class="bg-white rounded-lg shadow p-4 space-y-3">
@@ -29,39 +57,105 @@
     </div>
   </div>
 
-  {#if cardType !== 'pending'}
+  {#if isPendingShipment(shipment)}
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <span class="text-sm text-gray-500">Pickup Location</span>
+        <p class="font-medium">
+          {formatLocation(shipment.pickup)}
+        </p>
+      </div>
+      <div>
+        <span class="text-sm text-gray-500">Delivery Location</span>
+        <p class="font-medium">
+          {formatLocation(shipment.delivery)}
+        </p>
+      </div>
+    </div>
+
+    {#if shipment.status == 'BOUGHT_NO_ADDRESS'}
+      <div class="bg-yellow-40 border-l-4 border-yellow-400 p-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg
+              class="h-5 w-5 text-yellow-400"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <p class="text-sm text-yellow-700">
+              Carrier interested! Please set addresses to proceed.
+            </p>
+          </div>
+        </div>
+      </div>
+    {/if}
+  {/if}
+
+  {#if isBoughtShipment(shipment)}
     <div class="space-y-2">
-      {#if shipment.pickupDate}
-        <div class="flex justify-between">
-          <span class="text-sm text-gray-500">Pickup</span>
-          <span class={isToday(shipment.pickupDate) ? 'text-green-500' : ''}>
-            {shipment.pickupDate.toLocaleDateString()}
-          </span>
-        </div>
-      {/if}
-      {#if shipment.deliveryDate}
-        <div class="flex justify-between">
-          <span class="text-sm text-gray-500">Delivery</span>
-          <span class={isToday(shipment.deliveryDate) ? 'text-green-500' : ''}>
-            {shipment.deliveryDate.toLocaleDateString()}
-          </span>
-        </div>
-      {/if}
+      <div class="flex justify-between">
+        <span class="text-sm text-gray-500">Estimated Pickup</span>
+        <span
+          class={isToday(shipment.estimatedPickupDate) ? 'text-green-500' : ''}
+        >
+          {shipment.estimatedPickupDate?.toLocaleDateString() ??
+            'Pending Route'}
+        </span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-sm text-gray-500">Estimated Delivery</span>
+        <span
+          class={isToday(shipment.estimatedDeliveryDate)
+            ? 'text-green-500'
+            : ''}
+        >
+          {shipment.estimatedDeliveryDate?.toLocaleDateString() ??
+            'Pending Route'}
+        </span>
+      </div>
     </div>
   {/if}
 
-  {#if cardType === 'transit' && shipment.lastUpdate}
-    <div class="space-y-2 border-t pt-2">
-      <div class="flex justify-between">
-        <span class="text-sm text-gray-500">Last Update</span>
-        <span>{formatDistance(shipment.lastUpdate, new Date(), { addSuffix: true })}</span>
-      </div>
+  {#if isInTransitShipment(shipment)}
+    <div class="space-y-2">
+      {#if shipment.lastUpdate}
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-500">Last Update</span>
+          <span
+            >{formatDistance(shipment.lastUpdate, new Date(), {
+              addSuffix: true,
+            })}</span
+          >
+        </div>
+      {/if}
       {#if shipment.eta}
         <div class="flex justify-between">
           <span class="text-sm text-gray-500">ETA</span>
           <span>{shipment.eta} minutes</span>
         </div>
       {/if}
+      {#if shipment.currentLocation}
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-500">Current Location</span>
+          <span>
+            {shipment.currentLocation.lat.toFixed(4)}, {shipment.currentLocation.lng.toFixed(
+              4,
+            )}
+          </span>
+        </div>
+      {/if}
     </div>
   {/if}
-</div> 
+
+
+  {@render children()}
+
+</div>

@@ -1,46 +1,43 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, UpdateDateColumn, CreateDateColumn } from 'typeorm';
-import { ShipmentLocation } from './shipment-location.entity';
-import { IcpUser } from 'src/auth/entities/icp.user.entity';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, UpdateDateColumn, CreateDateColumn, JoinColumn, OneToOne, PrimaryColumn } from 'typeorm';
 import { Carrier } from 'src/carriers/entities/carrier.entity';
-import { ShipmentEvent } from './shipment-event.entity';
+import { Address } from './address.entity';
+import { Shipper } from 'src/auth/entities/shipper.entity';
 
 export enum ShipmentStatus {
-  CREATED = 'CREATED',         // Local state when created but not synced or not on canister yet
-  PENDING = 'PENDING',         // Matches canister Pending
-  READY_FOR_PICKUP = 'READY_FOR_PICKUP',  // Local intermediate
-  PICKED_UP = 'PICKED_UP',     // Local intermediate
-  IN_TRANSIT = 'IN_TRANSIT',   // Matches canister InTransit
-  DELIVERED = 'DELIVERED',     // Matches canister Delivered
-  CANCELLED = 'CANCELLED',     // Matches canister Cancelled
+  // Initial states
+  PENDING_NO_ADDRESS = 'PENDING_NO_ADDRESS',
+  PENDING_WITH_ADDRESS = 'PENDING_WITH_ADDRESS',
+  
+  // Purchase states
+  BOUGHT_NO_ADDRESS = 'BOUGHT_NO_ADDRESS',     // New state
+  BOUGHT_WITH_ADDRESS = 'BOUGHT_WITH_ADDRESS', // New state
+  
+  // Active states
+  READY_FOR_PICKUP = 'READY_FOR_PICKUP',
+  PICKED_UP = 'PICKED_UP',
+  IN_TRANSIT = 'IN_TRANSIT',
+  
+  // Final states
+  DELIVERED = 'DELIVERED',
+  CANCELLED = 'CANCELLED'
 }
-
 
 @Entity()
 export class Shipment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('bigint', { nullable: true })
+  @PrimaryColumn('bigint')
   canisterShipmentId: number;
 
-  @ManyToOne(() => IcpUser, (user) => user.shipments, { nullable: false })
-  shipper: IcpUser;
+  @ManyToOne(() => Shipper, (shipper) => shipper.shipments, { nullable: false })
+  shipper: Shipper;
 
-  // If assigned to a carrier principal
-  @ManyToOne(() => IcpUser, (user) => user.carriedShipments, { nullable: true })
-  carrierPrincipal: IcpUser;
-
-  @ManyToOne(() => Carrier, { nullable: true })
+  @ManyToOne(() => Carrier, (carrier) => carrier.carriedShipments, { nullable: true })
   assignedCarrier: Carrier;
 
-  @Column({ type: 'enum', enum: ShipmentStatus, default: ShipmentStatus.CREATED })
+  @Column({ type: 'enum', enum: ShipmentStatus, default: ShipmentStatus.PENDING_NO_ADDRESS })
   status: ShipmentStatus;
-
-  @OneToMany(() => ShipmentLocation, (location) => location.shipment, { cascade: true })
-  locations: ShipmentLocation[];
-
-  @OneToMany(() => ShipmentEvent, (event) => event.shipment, { cascade: true })
-  events: ShipmentEvent[];
 
   @Column('decimal', { precision: 10, scale: 2 })
   value: number;
@@ -62,4 +59,42 @@ export class Shipment {
 
   @Column('timestamp', { nullable: true })
   eta: Date;
+
+  @Column('timestamp', { nullable: true })
+  estimatedPickupTime: Date;
+
+  @Column('timestamp', { nullable: true })
+  estimatedDeliveryTime: Date;
+
+  @OneToOne(() => Address, address => address.pickupForShipment, { 
+    cascade: true,
+    eager: true 
+  })
+  @JoinColumn()
+  pickupAddress: Address;
+
+  @OneToOne(() => Address, address => address.deliveryForShipment, { 
+    cascade: true,
+    eager: true 
+  })
+  @JoinColumn()
+  deliveryAddress: Address;
+
+  @Column('timestamp', { nullable: true })
+  deliveryDate: Date;
+
+  @Column('timestamp', { nullable: true })
+  pickupDate: Date;
+
+  // @ManyToOne(() => Route, (route) => route.shipments, { nullable: true })
+  // route: Route;
+
+  @Column('jsonb', { nullable: true })
+  lastRouteSegment: { lat: number; lng: number }[];
+
+  @Column('timestamp', { nullable: true })
+  requiredDeliveryDate: Date;
+
+  @Column({ nullable: true })
+  trackingToken: string;
 } 

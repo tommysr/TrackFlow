@@ -1,12 +1,12 @@
-import { Shipment } from 'src/shipments/entities/shipment.entity';
-import { Entity, Column, PrimaryColumn, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryColumn, OneToOne } from 'typeorm';
+import { Shipper } from './shipper.entity';
+import { Carrier } from 'src/carriers/entities/carrier.entity';
 
 export enum UserRole {
-  UNKNOWN = 'UNKNOWN',
+  USER = 'USER',
+  ADMIN = 'ADMIN',
   SHIPPER = 'SHIPPER',
   CARRIER = 'CARRIER',
-  RECEIVER = 'RECEIVER',
-  ADMIN = 'ADMIN',
 }
 
 @Entity()
@@ -17,13 +17,13 @@ export class IcpUser {
   @Column({
     type: 'enum',
     enum: UserRole,
-    default: UserRole.UNKNOWN,
+    default: UserRole.USER,
   })
   role: UserRole;
 
-  @OneToMany(() => Shipment, (shipment) => shipment.shipper)
-  shipments: Shipment[];
+  @OneToOne(() => Shipper, (shipper) => shipper.identity, { nullable: true })
+  shipper: Shipper;
 
-  @OneToMany(() => Shipment, (shipment) => shipment.carrierPrincipal)
-  carriedShipments: Shipment[];
+  @OneToOne(() => Carrier, (carrier) => carrier.identity, { nullable: true })
+  carrier: Carrier;
 }

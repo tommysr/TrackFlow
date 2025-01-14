@@ -1,28 +1,23 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ShipmentsController } from './shipments.controller';
 import { ShipmentsService } from './shipments.service';
 import { ShipmentsSyncService } from './shipments-sync.service';
+import { AuthModule } from '../auth/auth.module';
 import { Shipment } from './entities/shipment.entity';
-import { ShipmentEvent } from './entities/shipment-event.entity';
-import { ShipmentLocation } from './entities/shipment-location.entity';
-import { IcpUser } from '../auth/entities/icp.user.entity';
-import { GPSData } from '../gps/entities/gps-data.entity';
-import { Carrier } from '../carriers/entities/carrier.entity';
+import { GPSData } from 'src/gps/entities/gps-data.entity';
+import { Address } from './entities/address.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Shipment,
-      ShipmentEvent,
-      ShipmentLocation,
-      IcpUser,
-      GPSData,
-      Carrier,
-    ]),
+    TypeOrmModule.forFeature([Shipment, GPSData, Address]),
+    forwardRef(() => AuthModule),
   ],
   controllers: [ShipmentsController],
-  providers: [ShipmentsService, ShipmentsSyncService],
+  providers: [
+    ShipmentsService, 
+    ShipmentsSyncService, 
+  ],
   exports: [ShipmentsService, ShipmentsSyncService],
 })
 export class ShipmentsModule {} 

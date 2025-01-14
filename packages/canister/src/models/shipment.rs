@@ -69,9 +69,7 @@ impl ShipmentInfo {
 pub enum ShipmentStatus {
     Pending,
     Bought,
-    InTransit,
     Delivered,
-    Cancelled,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, CandidType)]
@@ -144,7 +142,7 @@ impl Shipment {
         secret_key: Option<String>,
         caller: Principal,
     ) -> anyhow::Result<()> {
-        if self.status != ShipmentStatus::InTransit {
+        if self.status != ShipmentStatus::Bought {
             return Err(anyhow::anyhow!("shipment is not ready to be finalized"));
         }
 
@@ -167,7 +165,7 @@ impl Shipment {
         }
 
         self.carrier = Some(carrier.id());
-        self.status = ShipmentStatus::InTransit;
+        self.status = ShipmentStatus::Bought;
 
         carrier.add_shipment(self.id());
 

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
@@ -11,13 +11,14 @@ import { IcpUser } from './entities/icp.user.entity';
 import { ChallengeService } from './services/challenge.service';
 import { ShipmentGuard } from './guards/shipment.guard';
 import { RolesGuard } from './guards/roles.guard';
-import { ShipmentsModule } from 'src/shipments/shipments.module';
-
+import { ShipmentsModule } from '../shipments/shipments.module';
+import { Shipper } from './entities/shipper.entity';
+import { ShipmentSyncGuard } from './guards/shipment.sync.guard';
 @Module({
   imports: [
-    TypeOrmModule.forFeature([IcpUser]),
+    TypeOrmModule.forFeature([IcpUser, Shipper]),
     PassportModule,
-    ShipmentsModule,
+    forwardRef(() => ShipmentsModule),
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({
         secret: configService.get('JWT_SECRET'),
@@ -27,8 +28,16 @@ import { ShipmentsModule } from 'src/shipments/shipments.module';
       imports: [ConfigModule],
     }),
   ],
-  providers: [AuthService, JwtStrategy, IcpStrategy, ChallengeService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    IcpStrategy,
+    ChallengeService,
+    ShipmentGuard,
+    ShipmentSyncGuard,
+    RolesGuard
+  ],
   controllers: [AuthController],
-  exports: [AuthService],
+  exports: [AuthService, ShipmentGuard, RolesGuard, TypeOrmModule.forFeature([IcpUser, Shipper]), JwtModule],
 })
 export class AuthModule {} 

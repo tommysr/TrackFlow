@@ -3,6 +3,7 @@ import { writable } from 'svelte/store';
 import type { _SERVICE } from '../../../declarations/canister/canister.did';
 import { connect } from './canisters';
 import type { Delegation, DelegationsWithUserKey } from '$lib/canisters';
+import { invalidateAll } from '$app/navigation';
 
 export const wallet = createWallet();
 
@@ -14,7 +15,7 @@ export let stateWallet: MaybeWallet = $state({
 });
 
 export interface Wallet {
-  connected: true;
+  connected: boolean;
   actor: ActorSubclass<_SERVICE>;
   identity: Identity;
   delegations: DelegationsWithUserKey;
@@ -42,6 +43,8 @@ function createWallet() {
       stateWallet.actor = actor;
       stateWallet.identity = identity;
       stateWallet.delegations = delegations;
+
+      invalidateAll()
     },
   };
 }

@@ -6,7 +6,6 @@ import { type _SERVICE } from '../../../declarations/canister/canister.did.js';
 import { Principal } from '@dfinity/principal';
 import { DelegationIdentity } from '@dfinity/identity';
 import { arrayBufferToBase64, base64ToArrayBuffer } from './utils';
-import { verify } from '@dfinity/agent';
 
 const host = `http://localhost:4943`;
 const maxTimeToLive = 60 * 60 * 24 * 7 * 1000 * 1000; // 7 days
@@ -38,8 +37,7 @@ interface ChallengeResponse {
 }
 
 // For local development, use this root key
-const LOCAL_DFINITY_ROOT_KEY = new Uint8Array([48, 129, 130, 48, 29, 6, 13, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 1, 2, 1, 6, 12, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 2, 1, 3, 97, 0, 143, 15, 57, 247, 175, 198, 74, 135, 233, 86, 41, 30, 247, 27, 5, 253, 68, 141, 5, 14, 191, 204, 196, 89, 236, 198, 243, 62, 88, 246, 135, 107, 202, 182, 49, 42, 135, 31, 112, 8, 29, 118, 43, 114, 60, 148, 225, 199, 11, 235, 98, 207, 85, 74, 39, 159, 187, 234, 103, 87, 196, 15, 92, 53, 189, 150, 195, 9, 93, 189, 238, 16, 190, 35, 70, 9, 95, 58, 228, 199, 51, 145, 19, 101, 184, 38, 238, 142, 69, 83, 86, 119, 31, 194, 111, 238]
-);
+const LOCAL_DFINITY_ROOT_KEY = new Uint8Array([48, 129, 130, 48, 29, 6, 13, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 1, 2, 1, 6, 12, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 2, 1, 3, 97, 0, 150, 106, 89, 23, 204, 165, 151, 38, 182, 52, 238, 207, 191, 131, 238, 234, 4, 79, 18, 236, 41, 162, 69, 195, 221, 63, 158, 140, 198, 237, 155, 85, 105, 216, 128, 7, 135, 32, 114, 30, 75, 254, 176, 221, 76, 172, 19, 39, 9, 221, 117, 143, 206, 39, 0, 46, 106, 78, 194, 15, 188, 204, 125, 63, 7, 145, 169, 172, 158, 252, 153, 105, 24, 87, 245, 102, 236, 70, 77, 232, 215, 59, 99, 83, 25, 39, 200, 106, 165, 96, 86, 29, 130, 62, 199, 251])
 
 // Add function to get stored token
 export const getStoredToken = () => {
@@ -49,6 +47,7 @@ export const getStoredToken = () => {
 export const connect = async () => {
   let authClient = await AuthClient.create();
 
+  // Get challenge and sessionId
   // Get challenge and sessionId
   const challengeResponse = (await fetch(
     'http://localhost:5000/auth/challenge',
@@ -128,7 +127,7 @@ export const connect = async () => {
     },
   });
   
-  return { actor, identity, delegations, accessToken };
+  return { actor, identity, accessToken, delegations };
 };
 
 // Add helper function for authenticated requests
