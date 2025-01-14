@@ -15,9 +15,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
     this.logger.log('JWT Guard - handleRequest called');
-    this.logger.log('Error:', err);
-    this.logger.log('User:', user);
-    this.logger.log('Info:', info);
+    this.logger.log('Error:', JSON.stringify(err));
+    this.logger.log('User:', JSON.stringify(user));
+    this.logger.log('Info:', JSON.stringify(info));
 
     if (err || !user) {
       this.logger.error('JWT Guard - Authentication failed', { err, info });
