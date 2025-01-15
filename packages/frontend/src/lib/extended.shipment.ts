@@ -29,7 +29,7 @@ export interface LocationResponse {
 
 export interface AddressLocationResponse {
   address: AddressResponse | null;
-  location: LocationResponse;
+  location: LocationResponse | null;
   isComplete: boolean;
 }
 
@@ -114,4 +114,15 @@ export function isInTransitShipment(
   shipment: PendingShipment | BoughtShipment | InTransitShipment,
 ): shipment is InTransitShipment {
   return (shipment as InTransitShipment).status === 'IN_TRANSIT' || shipment.status === 'PICKED_UP';
+}
+
+export enum RouteOperationType {
+  PICKUP = 'pickup',
+  DELIVERY = 'delivery',
+  BOTH = 'both',
+}
+
+export interface ShipmentRouteOperation {
+  type: RouteOperationType;
+  id: number;
 }
