@@ -16,10 +16,12 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { User } from 'src/auth/decorators/user.decorator';
 import {
   BoughtShipmentResponseDto,
+  GeocodeResponseDto,
   PendingShipmentResponseDto,
 } from './dto/shipment-response.dto';
-import { CreateShipmentDto } from './dto/create-shipment.dto';
+import { GeocodeAddressDto, SetAddressDto } from './dto/create-shipment.dto';
 import { ShipmentSyncGuard } from 'src/auth/guards/shipment.sync.guard';
+import { GetAddressesDto } from './dto/get-addresses.dto';
 
 @Controller('shipments')
 @UseGuards(JwtAuthGuard)
@@ -29,14 +31,31 @@ export class ShipmentsController {
   constructor(private readonly shipmentsService: ShipmentsService) {}
 
   // Create a shipment, only shipper
-  @Post('create')
+  @Post('set-addresses')
   @Roles(UserRole.SHIPPER)
   @UseGuards(ShipmentSyncGuard)
   @UseGuards(ShipmentGuard)
-  async createShipment(
-    @Body() createShipmentDto: CreateShipmentDto,
-  ): Promise<{ trackingToken: string }> {
-    return this.shipmentsService.createShipment(createShipmentDto);
+  async setAddresses(
+    @Body() setAddressDto: SetAddressDto,
+  ): Promise<{trackingToken: string}> {
+    return this.shipmentsService.setAddress(setAddressDto);
+  }
+
+  @Post('geocode')
+  async geocodeAddress(
+    @Body() geocodeAddressDto: GeocodeAddressDto,
+  ): Promise<GeocodeResponseDto> {
+    return this.shipmentsService.geocodeAddress(geocodeAddressDto);
+  }
+
+  @Get('get-addresses/:id')
+  @Roles(UserRole.SHIPPER)
+  @UseGuards(ShipmentSyncGuard)
+  @UseGuards(ShipmentGuard)
+  async getAddresses(
+    @Param('id') id: number,
+  ): Promise<GeocodeResponseDto> {
+    return this.shipmentsService.getAddresses(id);
   }
 
   @Post(':id/ready-for-pickup')
@@ -67,7 +86,16 @@ export class ShipmentsController {
     return this.shipmentsService.findBoughtShipments(user.principal);
   }
 
-    // Set Pickup Date
+
+  @Get('my-carried')
+  @UseGuards(ShipmentSyncGuard)
+  async getMyCarriedShipments(
+    @User() user: IcpUser,
+  ): Promise<BoughtShipmentResponseDto[]> {
+    return this.shipmentsService.findCarriedShipments(user.principal);
+  }
+
+  // Set Pickup Date
   @Post(':id/pickup-date')
   @Roles(UserRole.CARRIER, UserRole.ADMIN)
   @UseGuards(ShipmentGuard)

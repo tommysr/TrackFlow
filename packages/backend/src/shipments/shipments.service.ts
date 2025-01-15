@@ -11,10 +11,14 @@ import {
   AddressLocationResponseDto,
   BaseShipmentResponseDto,
   BoughtShipmentResponseDto,
+  GeocodeResponseDto,
   PendingShipmentResponseDto,
 } from './dto/shipment-response.dto';
 import { ShipmentsSyncService } from './shipments-sync.service';
-import { CreateShipmentDto } from './dto/create-shipment.dto';
+import {
+  GeocodeAddressDto,
+  SetAddressDto,
+} from './dto/create-shipment.dto';
 import { geocodeAddress } from '../utils/geocode.util';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
@@ -32,7 +36,7 @@ export class ShipmentsService {
     @InjectRepository(Address)
     private readonly addressRepository: Repository<Address>,
   ) {
-    this.geocodingApiKey = this.configService.get('geocoding.apiKey');
+    this.geocodingApiKey = this.configService.get('routing.apiKey');
   }
 
   async findOneById(id: number): Promise<Shipment> {
@@ -48,7 +52,7 @@ export class ShipmentsService {
       ],
     });
 
-    console.log(`Shipment found: ${JSON.stringify(shipment)}`);
+    // console.log(`Shipment found: ${JSON.stringify(shipment)}`);
 
     if (!shipment) {
       throw new NotFoundException('Shipment not found');
@@ -63,40 +67,90 @@ export class ShipmentsService {
     });
   }
 
+  async getAddresses(
+    shipmentId: number,
+  ): Promise<GeocodeResponseDto> {
+    const shipment = await this.findOneById(shipmentId);
+
+    if (!shipment.pickupAddress.isComplete() || !shipment.deliveryAddress.isComplete()) {
+      throw new NotFoundException('Shipment does not have pickup or delivery addresses');
+    }
+
+    return {
+      pickup: this.toAddressResponse(shipment.pickupAddress),
+      delivery: this.toAddressResponse(shipment.deliveryAddress),
+    };
+  }
+
+  async geocodeAddress(
+    geocodeAddressDto: GeocodeAddressDto,
+  ): Promise<GeocodeResponseDto> {
+    const [geocodedPickupAddress, geocodedDeliveryAddress] = await Promise.all([
+      geocodeAddress(geocodeAddressDto.pickupAddress, this.geocodingApiKey),
+      geocodeAddress(geocodeAddressDto.deliveryAddress, this.geocodingApiKey),
+    ]);
+
+    return {
+      pickup: {
+        location: {
+          lat: geocodedPickupAddress.latitude,
+          lng: geocodedPickupAddress.longitude,
+        },
+        address: {
+          street: geocodeAddressDto.pickupAddress.street,
+          city: geocodeAddressDto.pickupAddress.city,
+          zip: geocodeAddressDto.pickupAddress.zip,
+          country: geocodeAddressDto.pickupAddress.country,
+        },
+        isComplete: false,
+      },
+      delivery: {
+        location: {
+          lat: geocodedDeliveryAddress.latitude,
+          lng: geocodedDeliveryAddress.longitude,
+        },
+        address: {
+          street: geocodeAddressDto.deliveryAddress.street,
+          city: geocodeAddressDto.deliveryAddress.city,
+          zip: geocodeAddressDto.deliveryAddress.zip,
+          country: geocodeAddressDto.deliveryAddress.country,
+        },
+        isComplete: false,
+      },
+    };
+  }
+
   // Modified createShipment to handle sync properly
-  async createShipment(
-    createShipmentDto: CreateShipmentDto,
+  async setAddress(
+    setAddressDto: SetAddressDto,
   ): Promise<{ trackingToken: string }> {
-    const shipment = await this.findOneById(createShipmentDto.shipmentId);
+    const shipment = await this.findOneById(setAddressDto.shipmentId);
 
     if (!shipment) {
       throw new NotFoundException('Shipment not found on ICP');
     }
 
-    if (shipment.status == ShipmentStatus.PENDING_WITH_ADDRESS) {
-      throw new BadRequestException('Shipment already has an address');
-    }
 
-    // Geocode both addresses
-    const [geocodedPickup, geocodedDelivery] = await Promise.all([
-      geocodeAddress(createShipmentDto.pickupAddress, this.geocodingApiKey),
-      geocodeAddress(createShipmentDto.deliveryAddress, this.geocodingApiKey),
-    ]);
+    if (
+      shipment.status == ShipmentStatus.BOUGHT_WITH_ADDRESS
+    ) {
+      throw new BadRequestException('Shipment addresses cant be changed');
+    }
 
     // Create pickup address
     const pickupAddress = this.addressRepository.create({
-      ...createShipmentDto.pickupAddress,
-      latitude: geocodedPickup.latitude,
-      longitude: geocodedPickup.longitude,
+      ...setAddressDto.pickupAddress,
+      latitude: setAddressDto.pickupAddress.lat,
+      longitude: setAddressDto.pickupAddress.lng,
       icpLat: shipment.pickupAddress.icpLat,
       icpLng: shipment.pickupAddress.icpLng,
     });
 
     // Create delivery address
     const deliveryAddress = this.addressRepository.create({
-      ...createShipmentDto.deliveryAddress,
-      latitude: geocodedDelivery.latitude,
-      longitude: geocodedDelivery.longitude,
+      ...setAddressDto.deliveryAddress,
+      latitude: setAddressDto.deliveryAddress.lat,
+      longitude: setAddressDto.deliveryAddress.lng,
       icpLat: shipment.deliveryAddress.icpLat,
       icpLng: shipment.deliveryAddress.icpLng,
     });
@@ -145,7 +199,6 @@ export class ShipmentsService {
   private toBaseShipmentResponseDto(
     shipment: Shipment,
   ): BaseShipmentResponseDto {
-    console.log(shipment);
     return {
       canisterShipmentId: shipment.canisterShipmentId,
       status: shipment.status,
@@ -156,14 +209,15 @@ export class ShipmentsService {
 
   private toAddressResponse(address: Address): AddressLocationResponseDto {
     return {
-      address: {
-        street: address.street,
-        city: address.city,
-        state: address.state,
-        zip: address.zip,
-        country: address.country,
-      },
-      location: address.getCurrentLocation(),
+      address: address.isComplete()
+        ? {
+            street: address.street,
+            city: address.city,
+            zip: address.zip,
+            country: address.country,
+          }
+        : null,
+      location: address.getPreciseLocation(),
       isComplete: address.isComplete(),
     };
   }
@@ -200,7 +254,7 @@ export class ShipmentsService {
       ],
     });
 
-    this.logger.log(shipments);
+    // this.logger.log(shipments);
 
     return shipments.map((shipment) =>
       this.toPendingShipmentResponseDto(shipment),
@@ -228,7 +282,7 @@ export class ShipmentsService {
       ],
     });
 
-    this.logger.log(shipments);
+    // this.logger.log(shipments);
 
     return shipments.map((shipment) => ({
       ...this.toPendingShipmentResponseDto(shipment),
@@ -327,5 +381,32 @@ export class ShipmentsService {
     shipment.deliveryDate = deliveryDate;
     await this.shipmentRepository.save(shipment);
     return true;
+  }
+
+  async findCarriedShipments(
+    principal: string,
+  ): Promise<BoughtShipmentResponseDto[]> {
+    const shipments = await this.shipmentRepository.find({
+      where: { assignedCarrier: { identity: { principal } } },
+      relations: [
+        'shipper',
+        'assignedCarrier',
+        'route',
+        'pickupAddress',
+        'deliveryAddress',
+      ],
+    });
+
+    return shipments.map((shipment) => ({
+      ...this.toPendingShipmentResponseDto(shipment),
+      assignedCarrier: shipment.assignedCarrier
+        ? {
+            name: shipment.assignedCarrier.name,
+            principal: shipment.assignedCarrier.identityId,
+          }
+        : null,
+      estimatedPickupDate: shipment.estimatedPickupTime,
+      estimatedDeliveryDate: shipment.estimatedDeliveryTime,
+    }));
   }
 }
