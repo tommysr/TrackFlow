@@ -148,7 +148,7 @@
           <ul class="w-full flex-1 space-y-4">
             {#each categories[selectedNav].data as shipment}
               <li>
-                <ShipmentCard cardType="shipper" {shipment}>
+                <ShipmentCard cardType="shipper" {shipment} onSelect={() => selectShipment(shipment)} selectable={true}>
                   {#if isBoughtShipment(shipment)}
                     <div class="flex mt-4 gap-5 justify-center">
                       <button
