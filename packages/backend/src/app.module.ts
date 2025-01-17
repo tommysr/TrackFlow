@@ -4,10 +4,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { ShipmentsModule } from './shipments/shipments.module';
 import { CarriersModule } from './carriers/carriers.module';
+import { RoutesModule } from './routes/routes.module';
+import { GPSModule } from './gps/gps.module';
 
 const configFactory = () => {
   console.log('Environment variables:');
   console.log('GEOCODING_API_KEY:', process.env.GEOCODING_API_KEY);
+  console.log('ROUTING_API_KEY:', process.env.ROUTING_API_KEY);
   console.log('DATABASE_HOST:', process.env.DATABASE_HOST);
   console.log('DATABASE_PORT:', process.env.DATABASE_PORT);
   console.log('DATABASE_USER:', process.env.DATABASE_USER);
@@ -75,6 +78,8 @@ const configFactory = () => {
     AuthModule,
     ShipmentsModule,
     CarriersModule,
+    RoutesModule,
+    GPSModule
   ],
   providers: [],
 })

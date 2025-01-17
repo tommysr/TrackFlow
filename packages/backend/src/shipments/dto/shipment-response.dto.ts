@@ -8,11 +8,10 @@ export class BaseShipmentResponseDto {
 }
 
 export class AddressResponseDto {
-  street?: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-  country?: string;
+  street: string;
+  city: string;
+  zip: string;
+  country: string;
 }
 
 export class LocationResponseDto {
@@ -22,13 +21,18 @@ export class LocationResponseDto {
 
 export class AddressLocationResponseDto {
   address: AddressResponseDto | null;
-  location: LocationResponseDto;
+  location: LocationResponseDto | null;
   isComplete: boolean;
 }
 
 export class CarrierResponseDto {
   name: string;
   principal: string;
+}
+
+export class GeocodeResponseDto {
+  pickup: AddressLocationResponseDto;
+  delivery: AddressLocationResponseDto;
 }
 
 export class PendingShipmentResponseDto extends BaseShipmentResponseDto {

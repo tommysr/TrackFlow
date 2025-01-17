@@ -62,6 +62,7 @@
     <Marker
       onClick={() => selectShipment(id)}
       location={info.source}
+     name={"P"}
     />
   {/each}
 {/if}

@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, UpdateDateColumn, Cr
 import { Carrier } from 'src/carriers/entities/carrier.entity';
 import { Address } from './address.entity';
 import { Shipper } from 'src/auth/entities/shipper.entity';
+import { Route } from 'src/aggregation/entities/route.entity';
 
 export enum ShipmentStatus {
   // Initial states
@@ -86,8 +87,8 @@ export class Shipment {
   @Column('timestamp', { nullable: true })
   pickupDate: Date;
 
-  // @ManyToOne(() => Route, (route) => route.shipments, { nullable: true })
-  // route: Route;
+  @ManyToOne(() => Route, (route) => route.shipments, { nullable: true })
+  route: Route;
 
   @Column('jsonb', { nullable: true })
   lastRouteSegment: { lat: number; lng: number }[];

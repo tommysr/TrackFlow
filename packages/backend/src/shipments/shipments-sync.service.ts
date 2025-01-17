@@ -250,25 +250,25 @@ export class ShipmentsSyncService {
 
   private async syncCarrier(principal: Principal): Promise<Carrier> {
     // First find or create ICP user
-    const icpUser = await this.userRepository.findOne({
+    let icpUser = await this.userRepository.findOne({
       where: { principal: principal.toString() },
     });
 
     if (!icpUser) {
-      const newIcpUser = this.userRepository.create({
+      icpUser = this.userRepository.create({
         principal: principal.toString(),
         role: UserRole.CARRIER,
       });
-      await this.userRepository.save(newIcpUser);
+      await this.userRepository.save(icpUser);
     }
 
     // Then find or create carrier
-    const carrier = await this.carrierRepository.findOne({
+    let carrier = await this.carrierRepository.findOne({
       where: { identity: { principal: icpUser.principal } },
     });
 
     if (!carrier) {
-      const newCarrier = this.carrierRepository.create({
+      carrier = this.carrierRepository.create({
         identity: icpUser,
         name: 'Unknown Carrier',
         contactInfo: 'No contact info',
@@ -276,7 +276,7 @@ export class ShipmentsSyncService {
         fuelCostPerLiter: 1.5,
         maxDailyRoutes: 1,
       });
-      await this.carrierRepository.save(newCarrier);
+      await this.carrierRepository.save(carrier);
     }
 
     return carrier;

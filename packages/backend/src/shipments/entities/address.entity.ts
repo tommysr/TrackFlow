@@ -13,9 +13,6 @@ export class Address {
   city: string;
 
   @Column({ nullable: true })
-  state: string;
-
-  @Column({ nullable: true })
   zip: string;
 
   @Column({ nullable: true })
@@ -33,20 +30,35 @@ export class Address {
   @Column('float')
   icpLng: number;
 
-  @OneToOne(() => Shipment, shipment => shipment.pickupAddress)
+  @OneToOne(() => Shipment, (shipment) => shipment.pickupAddress)
   pickupForShipment: Shipment;
 
-  @OneToOne(() => Shipment, shipment => shipment.deliveryAddress)
+  @OneToOne(() => Shipment, (shipment) => shipment.deliveryAddress)
   deliveryForShipment: Shipment;
 
   isComplete(): boolean {
-    return !!(this.street && this.city && this.state && this.zip && this.country && this.latitude && this.longitude);
+    return !!(
+      this.street &&
+      this.city &&
+      this.zip &&
+      this.latitude &&
+      this.longitude
+    );
   }
 
-  getCurrentLocation(): { lat: number; lng: number } {
+  getEstimatedLocation(): { lat: number; lng: number } {
     return {
-      lat: this.latitude || this.icpLat,
-      lng: this.longitude || this.icpLng
+      lat: this.icpLat,
+      lng: this.icpLng,
     };
+  }
+  // TODO: remove this when we have precise location from blockchain
+  getPreciseLocation(): { lat: number; lng: number } | null {
+    return this.latitude && this.longitude
+      ? {
+          lat: this.latitude,
+          lng: this.longitude,
+        }
+      : null;
   }
 }

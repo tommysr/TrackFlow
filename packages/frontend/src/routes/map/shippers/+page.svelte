@@ -17,11 +17,9 @@
   import Modal from '$components/Modal.svelte';
   import { authenticatedFetch } from '$src/lib/canisters';
   import { invalidateAll } from '$app/navigation';
+  import { Marker as M, MapEvents } from 'svelte-maplibre';
+    import { Ship } from 'lucide-svelte';
 
-  interface TrackingInfo {
-    secret: string;
-    trackingLink: string;
-  }
 
   let { data }: { data: PageData } = $props();
 
@@ -32,10 +30,16 @@
   let selectedShipment = $state<PendingShipment | null>(null);
   let isLoading = $state(false);
   let error: string | null = $state(null);
+  let previewMarkers = $state<{
+    source: { lat: number; lng: number };
+    destination: { lat: number; lng: number };
+    isPreviewMode: boolean;
+  } | null>(null);
 
   function selectShipment(
     shipment: PendingShipment | BoughtShipment | InTransitShipment,
   ) {
+    console.log('selectShipment', shipment, 'previewMarkers', previewMarkers?.isPreviewMode);
     selectedShipment = shipment;
   }
 
@@ -94,6 +98,12 @@
     }
   }
 
+  function handleMapClick(e: any) {
+    if (!previewMarkers?.isPreviewMode) {
+      selectedShipment = null;
+    }
+  }
+
   $inspect(data);
 </script>
 
@@ -102,14 +112,6 @@
   <meta name="description" content="Svelte demo app" />
 </svelte:head>
 
-{#if isWalletConnected}
-  {#each categories[selectedNav].data as shipment}
-    <Marker
-      onClick={() => selectShipment(shipment)}
-      location={shipment.info.source}
-    />
-  {/each}
-{/if}
 
 <ListWrapper bind:isMobileOpen>
   {#if !isWalletConnected}
@@ -146,7 +148,7 @@
           <ul class="w-full flex-1 space-y-4">
             {#each categories[selectedNav].data as shipment}
               <li>
-                <ShipmentCard {shipment}>
+                <ShipmentCard cardType="shipper" {shipment} onSelect={() => selectShipment(shipment)} selectable={true}>
                   {#if isBoughtShipment(shipment)}
                     <div class="flex mt-4 gap-5 justify-center">
                       <button
@@ -211,24 +213,104 @@
   {/if}
 </ListWrapper>
 
-{#if showAddressModal && selectedShipment}
-  <Modal
-    bind:showModal={showAddressModal}
-    onClose={() => (showAddressModal = false)}
-  >
-    <AddressForm
-      shipment={selectedShipment}
-      bind:showModal={showAddressModal}
-      onClose={() => (showAddressModal = false)}
-    />
-  </Modal>
-{/if}
+<AddressForm
+  shipment={selectedShipment}
+  bind:showModal={showAddressModal}
+  onClose={() => (showAddressModal = false)}
+  onCoordinates={(e) => (previewMarkers = e)}
+/>
 
-{#if !showAddressModal}
+{#if !selectedShipment && !previewMarkers?.isPreviewMode}
   {#each categories[selectedNav].data as shipment}
     <Marker
       onClick={() => selectShipment(shipment)}
-      location={shipment.info.source}
+      location={shipment.pickup.location ? shipment.pickup.location : shipment.info.source}
+      name={'P'}
     />
   {/each}
+{:else if selectedShipment && !previewMarkers?.isPreviewMode}
+  <Marker
+    onClick={() => selectedShipment = null}
+    location={selectedShipment.pickup.location ? selectedShipment.pickup.location : selectedShipment.info.source}
+    name={'P'}
+  />
+  <Marker
+    onClick={() => selectedShipment = null}
+    location={selectedShipment.delivery.location ? selectedShipment.delivery.location : selectedShipment.info.destination}
+    name={'D'}
+  />
+{:else if previewMarkers}
+  <M
+    lngLat={[previewMarkers.source.lng, previewMarkers.source.lat]}
+    draggable={true}
+    on:dragend={(e) => {
+      const [lng, lat] = e.detail.lngLat;
+      previewMarkers = {
+        ...previewMarkers!,
+        destination: previewMarkers!.destination,
+        isPreviewMode: previewMarkers!.isPreviewMode,
+        source: { lat, lng },
+      };
+    }}
+  >
+    <div class="pin bounce-a active">P</div>
+  </M>
+
+  <M
+    lngLat={[previewMarkers.destination.lng, previewMarkers.destination.lat]}
+    draggable={true}
+    on:dragend={(e) => {
+      const [lng, lat] = e.detail.lngLat;
+      previewMarkers = {
+        ...previewMarkers!,
+        source: previewMarkers!.source,
+        isPreviewMode: previewMarkers!.isPreviewMode,
+        destination: { lat, lng },
+      };
+    }}
+  >
+    <div class="pin bounce-a active">D</div>
+  </M>
 {/if}
+
+<MapEvents on:click={handleMapClick} />
+
+<style>
+  .pin {
+    width: 30px;
+    height: 30px;
+    border-radius: 50% 50% 50% 0;
+    background: #00cae9;
+    position: absolute;
+    transform: rotate(-45deg);
+    left: 50%;
+    top: 50%;
+    margin: -15px 0 0 -15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+  }
+
+  .pin.active {
+    background: linear-gradient(45deg, #00cae9, #e95f8a);
+  }
+
+  .pin :global(span) {
+    transform: rotate(45deg);
+  }
+
+  .bounce-a {
+    animation: bounce 0.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes bounce {
+    from {
+      transform: rotate(-45deg) translateY(0);
+    }
+    to {
+      transform: rotate(-45deg) translateY(-5px);
+    }
+  }
+</style>

@@ -4,24 +4,27 @@
     isInTransitShipment,
     isPendingShipment,
     type AddressLocationResponse,
-    type AddressResponse,
     type BoughtShipment,
     type InTransitShipment,
-    type LocationResponse,
     type PendingShipment,
-    type BackendStatus,
   } from '$lib/extended.shipment';
   import { formatDistance } from 'date-fns';
-  import { authenticatedFetch } from '$lib/canisters';
-  import { invalidateAll } from '$app/navigation';
   import type { Snippet } from 'svelte';
 
   let {
     shipment,
     children,
+    selectable,
+    selected,
+    onSelect,
+    cardType,
   }: {
     shipment: PendingShipment | BoughtShipment | InTransitShipment;
     children: Snippet;
+    selectable?: boolean;
+    selected?: boolean;
+    onSelect?: () => void;
+    cardType?: 'shipper' | 'driver';
   } = $props();
 
   let isToday = $derived((date?: Date) => {
@@ -30,17 +33,42 @@
     return date.toDateString() === today.toDateString();
   });
 
-
   const formatLocation = (addressLocation: AddressLocationResponse) => {
     if (addressLocation.isComplete) {
       return `${addressLocation.address?.street}, ${addressLocation.address?.city}`;
     }
-    return `Approx. (${addressLocation.location.lat.toFixed(4)}, ${addressLocation.location.lng.toFixed(4)})`;
+    if (addressLocation.location) {
+      return `Approx. (${addressLocation.location.lat.toFixed(4)}, ${addressLocation.location.lng.toFixed(4)})`;
+    }
+    return 'Unknown';
   };
 
+  function handleClick() {
+    if (selectable) {
+      onSelect?.();
+    }
+  }
+
+  function handleKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleClick();
+    }
+  }
+
+  $inspect(selected);
 </script>
 
-<div class="bg-white rounded-lg shadow p-4 space-y-3">
+
+<div
+  class="bg-white rounded-lg shadow p-4 space-y-3 cursor-pointer {selectable
+    ? 'hover:ring-4 hover:ring-blue-400'
+    : 'bg-gray-300'} {selected ? 'ring-4 ring-blue-500' : ''}"
+  onclick={handleClick}
+  onkeydown={handleKeyDown}
+  role="button"
+  tabindex="0"
+>
   <div class="flex justify-between items-center">
     <h3 class="text-lg font-semibold">{shipment.name}</h3>
     <span class="text-sm text-gray-500">ID: {shipment.id}</span>
@@ -73,7 +101,7 @@
       </div>
     </div>
 
-    {#if shipment.status == 'BOUGHT_NO_ADDRESS'}
+    {#if cardType === 'shipper' && shipment.status == 'BOUGHT_NO_ADDRESS'}
       <div class="bg-yellow-40 border-l-4 border-yellow-400 p-4">
         <div class="flex">
           <div class="flex-shrink-0">
@@ -155,7 +183,5 @@
     </div>
   {/if}
 
-
   {@render children()}
-
 </div>
