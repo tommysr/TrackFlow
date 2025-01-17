@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, ValidateNested, IsNumber, Matches, IsISBN, IsPostalCode, isAlphanumeric } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  ValidateNested,
+  IsNumber,
+  Matches,
+  IsISBN,
+  IsPostalCode,
+  isAlphanumeric,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class AddressDto {
@@ -23,7 +32,7 @@ export class AddressDto {
   country: string;
 }
 
-export class AddressLocationDto extends AddressDto {
+export class LocationDto {
   @IsNumber()
   @IsNotEmpty()
   lat: number;
@@ -32,6 +41,8 @@ export class AddressLocationDto extends AddressDto {
   @IsNotEmpty()
   lng: number;
 }
+
+export class AddressLocationDto extends LocationDto {}
 
 export class SetAddressDto {
   @ValidateNested()
@@ -46,7 +57,7 @@ export class SetAddressDto {
   @IsNumber()
   @IsNotEmpty()
   shipmentId: number;
-} 
+}
 
 export class GeocodeAddressDto {
   @ValidateNested()
