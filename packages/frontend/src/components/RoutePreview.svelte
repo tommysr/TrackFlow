@@ -1,10 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import maplibre, { type GeoJSONSource } from 'maplibre-gl';
-  import 'maplibre-gl/dist/maplibre-gl.css';
-  import type { RouteOptimizationResult, Location } from '../../../backend/src/routes/route-optimization.service';
-
-  export let routePreview: {
+  import { getContext } from 'svelte';
+  import type { MapContext } from 'svelte-maplibre/dist/context';
+  import { LngLatBounds } from 'maplibre-gl';
+  export type RoutePreview = {
     shipments: Array<{
       pickupAddress: { latitude: number; longitude: number };
       deliveryAddress: { latitude: number; longitude: number };
@@ -18,51 +16,34 @@
     };
   };
 
-  let map: maplibre.Map;
-  let mapElement: HTMLElement;
+  let { routePreview, onBack, onCreate }: { routePreview: RoutePreview, onBack: () => void, onCreate: () => void } = $props();
 
-  onMount(() => {
-    // Initialize map
-    map = new maplibre.Map({
-      container: mapElement,
-      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json', // Replace with your map style URL
-      center: [21.017532, 52.237049], // Note: MapLibre uses [lng, lat] order
-      zoom: 6
-    });
+  let store = getContext<MapContext>(Symbol.for('svelte-maplibre')).map;
+  let map = $derived<maplibregl.Map | null>($store);
 
-    map.on('load', () => {
-      if (routePreview) {
-        displayRoute();
-      }
-    });
-
-    return () => {
-      map.remove();
-    };
+  // Watch for changes in routePreview and update map
+  $effect(() => {
+    if (routePreview && map) {
+      updateMapDisplay();
+    }
   });
 
-  function displayRoute() {
-    if (!map || !routePreview) return;
-
-    console.log('Route geometry:', routePreview.geometry);
-
+  function updateMapDisplay() {
+    if (!map) return;
     // Remove existing layers if they exist
     if (map.getLayer('route')) map.removeLayer('route');
-    if (map.getLayer('points')) map.removeLayer('points');
+    if (map.getLayer('route-points')) map.removeLayer('route-points');
     if (map.getSource('route')) map.removeSource('route');
-    if (map.getSource('points')) map.removeSource('points');
-
-    // Create GeoJSON for the route
-    const routeGeoJSON = {
-      type: 'Feature',
-      properties: {},
-      geometry: routePreview.geometry
-    };
+    if (map.getSource('route-points')) map.removeSource('route-points');
 
     // Add route line
     map.addSource('route', {
       type: 'geojson',
-      data: routeGeoJSON
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: routePreview.geometry,
+      },
     });
 
     map.addLayer({
@@ -71,91 +52,126 @@
       source: 'route',
       layout: {
         'line-join': 'round',
-        'line-cap': 'round'
+        'line-cap': 'round',
       },
       paint: {
         'line-color': '#0066FF',
         'line-width': 4,
-        'line-opacity': 0.8
-      }
+        'line-opacity': 0.8,
+      },
     });
 
-    // Create points for pickup and delivery locations
-    const points = routePreview.shipments.flatMap(shipment => ([
+    // Add points
+    const points = routePreview.shipments.flatMap((shipment) => [
       {
         type: 'Feature',
         properties: { type: 'pickup' },
         geometry: {
           type: 'Point',
-          coordinates: [shipment.pickupAddress.longitude, shipment.pickupAddress.latitude]
-        }
+          coordinates: [
+            shipment.pickupAddress.longitude,
+            shipment.pickupAddress.latitude,
+          ],
+        },
       },
       {
         type: 'Feature',
         properties: { type: 'delivery' },
         geometry: {
           type: 'Point',
-          coordinates: [shipment.deliveryAddress.longitude, shipment.deliveryAddress.latitude]
-        }
-      }
-    ]));
+          coordinates: [
+            shipment.deliveryAddress.longitude,
+            shipment.deliveryAddress.latitude,
+          ],
+        },
+      },
+    ]);
 
-    // Add points to map
-    map.addSource('points', {
+    map.addSource('route-points', {
       type: 'geojson',
       data: {
         type: 'FeatureCollection',
-        features: points
-      }
+        features: points,
+      },
     });
 
-    // Add point markers
     map.addLayer({
-      id: 'points',
+      id: 'route-points',
       type: 'circle',
-      source: 'points',
+      source: 'route-points',
       paint: {
         'circle-radius': 8,
         'circle-color': [
           'match',
           ['get', 'type'],
-          'pickup', '#00ff00',
-          'delivery', '#ff0000',
-          '#000000'
-        ]
-      }
+          'pickup',
+          '#00ff00',
+          'delivery',
+          '#ff0000',
+          '#000000',
+        ],
+      },
     });
 
     // Fit map to show all points and route
-    const bounds = new maplibre.LngLatBounds();
-
-    // Add route coordinates to bounds
-    if (routePreview.geometry?.coordinates) {
-      routePreview.geometry.coordinates.forEach((coord) => {
-        bounds.extend(coord);
-      });
-    }
-
-    // Add shipment points to bounds
-    routePreview.shipments.forEach((shipment) => {
-      bounds.extend([shipment.pickupAddress.longitude, shipment.pickupAddress.latitude]);
-      bounds.extend([shipment.deliveryAddress.longitude, shipment.deliveryAddress.latitude]);
-    });
-
-    // Only fit bounds if we have points
-    if (!bounds.isEmpty()) {
-      map.fitBounds(bounds, { padding: 50 });
-    }
+    const bounds = new LngLatBounds();
+    routePreview.geometry.coordinates.forEach((coord) => bounds.extend(coord));
+    map.fitBounds(bounds, { padding: 50 });
   }
 
-  $: if (map?.loaded() && routePreview?.geometry) {
-    console.log('Updating route display');
-    displayRoute();
+  function handleBack() {
+    // Clear route from map
+    if (map) {
+      if (map.getLayer('route')) map.removeLayer('route');
+      if (map.getLayer('route-points')) map.removeLayer('route-points');
+      if (map.getSource('route')) map.removeSource('route');
+      if (map.getSource('route-points')) map.removeSource('route-points');
+    }
+    onBack();
   }
 </script>
 
-<div bind:this={mapElement} class="w-full h-[400px] rounded-lg shadow-lg" />
+<div
+  class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-4 z-10 w-[600px]"
+>
+  <div class="flex flex-col space-y-4">
+    <div class="text-center">
+      <p class="text-lg font-semibold">Route Preview</p>
+      <p class="text-sm text-gray-600">Review route details before creating</p>
+    </div>
 
-<style>
-  @import 'maplibre-gl/dist/maplibre-gl.css';
-</style> 
+    <div class="grid grid-cols-3 gap-4 px-6 py-2 bg-gray-50 rounded-lg">
+      <div class="text-center">
+        <p class="text-sm text-gray-600">Total Distance</p>
+        <p class="font-semibold">{routePreview.totalDistance.toFixed(2)} km</p>
+      </div>
+      <div class="text-center">
+        <p class="text-sm text-gray-600">Estimated Time</p>
+        <p class="font-semibold">
+          {(routePreview.estimatedTime / 60).toFixed(2)} hours
+        </p>
+      </div>
+      <div class="text-center">
+        <p class="text-sm text-gray-600">Fuel Cost</p>
+        <p class="font-semibold">${routePreview.totalFuelCost.toFixed(2)}</p>
+      </div>
+    </div>
+
+    <div class="flex justify-center space-x-4">
+      <button
+        type="button"
+        onclick={handleBack}
+        class="bg-gray-500 rounded-full px-7 py-2 text-white text-base transition ease-in-out hover:-translate-y-0.5 hover:scale-105 duration-200"
+      >
+        Back
+      </button>
+      <button
+        type="button"
+        onclick={onCreate}
+        class="bg-gradient-to-r from-blue-500 to-rose-400 rounded-full px-7 py-2 text-white text-base transition ease-in-out hover:-translate-y-0.5 hover:scale-105 duration-200"
+      >
+        Create Route
+      </button>
+    </div>
+  </div>
+</div>
