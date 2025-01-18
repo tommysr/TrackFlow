@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-
+  import type { MapContext } from 'svelte-maplibre/dist/context';
+  import { LngLatBounds } from 'maplibre-gl';
   export type RoutePreview = {
     shipments: Array<{
       pickupAddress: { latitude: number; longitude: number };
