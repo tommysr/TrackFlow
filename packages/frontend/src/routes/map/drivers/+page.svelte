@@ -101,6 +101,14 @@
     }
   }
 
+  function handleBack() {
+    routePreview = null;
+  }
+
+  function handleCreateRoute() {
+    createRoute();
+  }
+
   $inspect(selectedShipments);
 </script>
 
@@ -158,16 +166,11 @@
         </div>
 
         {#if routePreview}
-          <div class="w-full px-4 mb-4">
-            <RoutePreview {routePreview} />
-            <div class="mt-2 text-sm text-gray-600">
-              <p>Total Distance: {routePreview.totalDistance.toFixed(2)} km</p>
-              <p>
-                Estimated Time: {(routePreview.estimatedTime / 60).toFixed(2)} hours
-              </p>
-              <p>Fuel Cost: ${routePreview.totalFuelCost.toFixed(2)}</p>
-            </div>
-          </div>
+          <RoutePreview 
+            {routePreview}
+            onBack={handleBack}
+            onCreate={handleCreateRoute}
+          />
         {/if}
       {/if}
       {#if categories[selectedNav].data.length > 0}
