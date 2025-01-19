@@ -23,9 +23,24 @@ async function setupTestDatabase() {
     
     // Create test database
     await connection.query(`CREATE DATABASE ${configService.get('DATABASE_NAME')}`);
-    
-    console.log('Test database created successfully');
+
+    // Connect to the new database to install PostGIS
     await connection.destroy();
+    const newConnection = new DataSource({
+      type: 'postgres',
+      host: configService.get('DATABASE_HOST'),
+      port: configService.get('DATABASE_PORT'),
+      username: configService.get('DATABASE_USER'),
+      password: configService.get('DATABASE_PASSWORD'),
+      database: configService.get('DATABASE_NAME'),
+    });
+    await newConnection.initialize();
+    
+    // Install PostGIS extension
+    await newConnection.query('CREATE EXTENSION IF NOT EXISTS postgis;');
+    
+    console.log('Test database and PostGIS extension created successfully');
+    await newConnection.destroy();
     
     process.exit(0);
   } catch (error) {
