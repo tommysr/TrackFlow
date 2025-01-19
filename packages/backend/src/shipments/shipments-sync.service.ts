@@ -69,7 +69,9 @@ export class ShipmentsSyncService {
       this.logger.debug(`Received ${events.length} events from canister`);
 
       for (const timestampedEvent of events) {
-        this.logger.debug(`Processing event from timestamped event: ${Number(timestampedEvent.timestamp)}`);
+        this.logger.debug(
+          `Processing event from timestamped event: ${Number(timestampedEvent.timestamp)}`,
+        );
         await this.processEvent(timestampedEvent.event);
         this.lastProcessedSequence = timestampedEvent.sequence;
       }
@@ -92,12 +94,18 @@ export class ShipmentsSyncService {
     }
   }
 
-  private async handleBoughtUpdate(shipment: Shipment, carrierPrincipal: Principal): Promise<void> {
+  private async handleBoughtUpdate(
+    shipment: Shipment,
+    carrierPrincipal: Principal,
+  ): Promise<void> {
     const carrier = await this.syncCarrier(carrierPrincipal);
-    shipment.assignedCarrier = carrier;
+    shipment.carrier = carrier;
 
     // Update status based on address completion
-    if (!shipment.pickupAddress.isComplete() || !shipment.deliveryAddress.isComplete()) {
+    if (
+      !shipment.pickupAddress.isComplete() ||
+      !shipment.deliveryAddress.isComplete()
+    ) {
       shipment.status = ShipmentStatus.BOUGHT_NO_ADDRESS;
     } else {
       shipment.status = ShipmentStatus.BOUGHT_WITH_ADDRESS;
@@ -110,7 +118,6 @@ export class ShipmentsSyncService {
     const shipment = await this.shipmentRepository.findOne({
       where: { canisterShipmentId: Number(event.CarrierAssigned.shipment_id) },
     });
-
 
     if (!shipment) {
       this.logger.debug('Shipment not found');
@@ -156,7 +163,7 @@ export class ShipmentsSyncService {
         where: { canisterShipmentId: Number(canisterShipment.id) },
         relations: [
           'shipper',
-          'assignedCarrier',
+          'carrier',
           'route',
           'pickupAddress',
           'deliveryAddress',
@@ -228,19 +235,23 @@ export class ShipmentsSyncService {
     if (!icpUser) {
       icpUser = this.userRepository.create({
         principal: principal.toString(),
-        role: UserRole.USER,
+        roles: [UserRole.USER, UserRole.SHIPPER],
       });
+      await this.userRepository.save(icpUser);
+    } else if (!icpUser.roles.includes(UserRole.SHIPPER)) {
+      icpUser.roles = [...icpUser.roles, UserRole.SHIPPER];
       await this.userRepository.save(icpUser);
     }
 
     // Get or create shipper
     let shipper = await this.shipperRepository.findOne({
-      where: { identity: { principal: icpUser.principal } },
+      where: { principal: icpUser.principal },
+      relations: ['user'],
     });
 
     if (!shipper) {
       shipper = this.shipperRepository.create({
-        identity: icpUser,
+        user: icpUser,
       });
       await this.shipperRepository.save(shipper);
     }
@@ -257,24 +268,25 @@ export class ShipmentsSyncService {
     if (!icpUser) {
       icpUser = this.userRepository.create({
         principal: principal.toString(),
-        role: UserRole.CARRIER,
+        roles: [UserRole.USER, UserRole.CARRIER],
       });
+      await this.userRepository.save(icpUser);
+    } else if (!icpUser.roles.includes(UserRole.CARRIER)) {
+      icpUser.roles = [...icpUser.roles, UserRole.CARRIER];
       await this.userRepository.save(icpUser);
     }
 
     // Then find or create carrier
     let carrier = await this.carrierRepository.findOne({
-      where: { identity: { principal: icpUser.principal } },
+      where: { principal: icpUser.principal },
+      relations: ['user'],
     });
 
     if (!carrier) {
       carrier = this.carrierRepository.create({
-        identity: icpUser,
-        name: 'Unknown Carrier',
-        contactInfo: 'No contact info',
+        user: icpUser,
         fuelEfficiency: 12,
         fuelCostPerLiter: 1.5,
-        maxDailyRoutes: 1,
       });
       await this.carrierRepository.save(carrier);
     }

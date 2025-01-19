@@ -20,9 +20,8 @@ export class GPSService {
     timestamp: Date;
   }): Promise<GPSData> {
     const gpsData = this.gpsRepository.create({
-      carrier: { id: data.carrierId },
-      latitude: data.latitude,
-      longitude: data.longitude,
+      carrier: { principal: data.carrierId },
+      location: { type: 'Point', coordinates: [data.longitude, data.latitude] },
       timestamp: data.timestamp,
     });
     return this.gpsRepository.save(gpsData);
@@ -30,7 +29,7 @@ export class GPSService {
 
   async getLastKnownLocation(carrierId: string): Promise<GPSData | null> {
     return this.gpsRepository.findOne({
-      where: { carrier: { id: carrierId } },
+      where: { carrier: { principal: carrierId } },
       order: { timestamp: 'DESC' },
     });
   }

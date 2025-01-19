@@ -13,7 +13,6 @@ export class ShipmentRouteOperation {
   id: number;
 
   @IsEnum(RouteOperationType)
-  @Matches(/^(both)$/) // TODO: add pickup and delivery
   type: RouteOperationType;
 }
 
@@ -30,5 +29,5 @@ export class CreateRouteDto {
 
   @IsDate()
   @Type(() => Date)
-  date: Date;
+  estimatedStartTime: Date;
 } 

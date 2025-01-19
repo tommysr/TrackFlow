@@ -16,9 +16,9 @@ export class CarriersService {
     updateCarrierDto: UpdateCarrierDto,
     user: IcpUser,
   ): Promise<Carrier> {
-    const carrier = await this.carrierRepository.findOne({ where: { identity: { principal: user.principal } } });
+    const carrier = await this.carrierRepository.findOne({ where: { principal: user.principal } });
 
-    if (!carrier && user.role !== UserRole.ADMIN) {
+    if (!carrier && !user.roles.includes(UserRole.ADMIN)) {
       throw new NotFoundException('You are not authorized to update this carrier');
     }
 

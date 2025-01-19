@@ -22,8 +22,7 @@ export class AuthService {
     const icpUser = await this.validateIcpPayload(icpPayload);
     const jwtPayload: JwtPayload = {
       sub: icpUser.principal,
-      principal: icpUser.principal,
-      role: icpUser.role,
+      principal: icpUser.principal
     };
     const options = {
       secret: this.configService.get<string>('JWT_SECRET'),
@@ -44,7 +43,7 @@ export class AuthService {
       if (!icpUser) {
         icpUser = this.icpUserRepository.create({
           principal: icpPayload.principal,
-          role: UserRole.USER,
+          roles: [UserRole.USER],
         });
         await this.icpUserRepository.save(icpUser);
       }
