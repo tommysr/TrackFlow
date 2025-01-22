@@ -37,7 +37,7 @@ interface ChallengeResponse {
 }
 
 // For local development, use this root key
-const LOCAL_DFINITY_ROOT_KEY = new Uint8Array([48, 129, 130, 48, 29, 6, 13, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 1, 2, 1, 6, 12, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 2, 1, 3, 97, 0, 165, 187, 228, 95, 251, 45, 169, 240, 44, 74, 202, 24, 210, 40, 39, 53, 21, 31, 132, 64, 67, 2, 79, 1, 56, 156, 207, 7, 98, 228, 30, 169, 138, 37, 113, 171, 86, 3, 95, 207, 227, 34, 64, 140, 24, 231, 148, 206, 7, 217, 94, 204, 93, 222, 122, 153, 118, 107, 242, 23, 165, 146, 0, 187, 126, 12, 72, 5, 18, 13, 46, 124, 230, 43, 48, 30, 130, 51, 162, 45, 144, 82, 32, 71, 172, 34, 103, 163, 98, 53, 16, 207, 102, 19, 95, 139])
+const LOCAL_DFINITY_ROOT_KEY = new Uint8Array([48, 129, 130, 48, 29, 6, 13, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 1, 2, 1, 6, 12, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 2, 1, 3, 97, 0, 185, 197, 118, 83, 202, 206, 27, 193, 168, 116, 2, 229, 201, 115, 236, 233, 203, 243, 1, 58, 120, 225, 253, 82, 8, 224, 240, 111, 29, 4, 77, 120, 45, 37, 0, 55, 38, 45, 148, 216, 125, 6, 138, 191, 232, 38, 12, 86, 15, 101, 251, 175, 173, 3, 192, 26, 159, 44, 184, 255, 52, 89, 41, 179, 91, 95, 102, 178, 49, 47, 90, 26, 180, 231, 106, 165, 14, 45, 19, 226, 123, 100, 120, 170, 119, 46, 204, 105, 52, 60, 120, 147, 72, 12, 216, 246])
 
 // Add function to get stored token
 export const getStoredToken = () => {
@@ -131,20 +131,27 @@ export const connect = async () => {
 };
 
 // Add helper function for authenticated requests
-export const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
+export async function authenticatedFetch(url: string, init?: RequestInit) {
   const token = getStoredToken();
   if (!token) {
     throw new Error('No authentication token found');
   }
 
-  return fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+  const headers = new Headers(init?.headers);
+  headers.set('Content-Type', 'application/json');
+  headers.set('Authorization', `Bearer ${token}`);
+  
+  const response = await fetch(url, {
+    ...init,
+    headers,
   });
-};
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+    throw new Error(error.message || 'Failed to fetch');
+  }
+
+  return response;
+}
 
 export const contractCanister = canisterIds.frontend.local;

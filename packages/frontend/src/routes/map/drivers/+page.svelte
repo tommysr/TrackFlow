@@ -10,6 +10,9 @@
     type ShipmentRouteOperation,
   } from '$src/lib/extended.shipment';
   import RoutePreview from '$components/RoutePreview.svelte';
+  import Marker from '$components/Marker.svelte';
+  import type { MapContext } from 'svelte-maplibre/dist/context';
+  import { getContext } from 'svelte';
 
   let { data }: { data: PageData } = $props();
 
@@ -38,6 +41,27 @@
     { name: 'Statistics', data: [], type: 'statistics' },
   ];
 
+  let store = getContext<MapContext>(Symbol.for('svelte-maplibre')).map;
+  let map = $derived<maplibregl.Map | null>($store);
+  let currentZoom = $state(map?.getZoom() || 0);
+
+
+ const handleZoom = () => {
+  if (map) {
+      currentZoom = Math.round(map.getZoom());
+    }
+  };
+
+  // Add zoom change handler
+  $effect(() => {
+    if (map) {
+      map.on('zoomend', handleZoom);
+      return () => {
+        map.off('zoomend', handleZoom);
+      };
+    }
+  });
+
   async function toggleShipmentSelection(shipmentId: number) {
     console.log('toggleShipmentSelection', shipmentId);
     if (selectedShipments.has(shipmentId)) {
@@ -46,30 +70,38 @@
       selectedShipments.add(shipmentId);
     }
     selectedShipments = new Set(selectedShipments);
+
+    routePreview = null;
   }
 
   async function previewRoute() {
     isCreatingRoute = true;
     try {
+      const shipmentOperations = Array.from(selectedShipments).map(
+        (id) =>
+          ({
+            id,
+            type: RouteOperationType.BOTH,
+          }) as ShipmentRouteOperation,
+      );
+
+      // Instead of query params, use POST with body
       const response = await authenticatedFetch(
-        'http://localhost:5000/routes/preview',
+        'http://localhost:5000/routes/simulate',
         {
-          method: 'POST',
+          method: 'POST', // Change to POST
           body: JSON.stringify({
-            shipments: Array.from(selectedShipments).map(
-              (id) =>
-                ({
-                  id,
-                  type: RouteOperationType.BOTH, // Could be enhanced to allow choosing PICKUP or DELIVERY
-                }) as ShipmentRouteOperation,
-            ),
+            shipments: shipmentOperations,
+            estimatedStartTime: new Date().toISOString(),
           }),
         },
       );
 
-      if (response.ok) {
-        routePreview = await response.json();
+      if (!response.ok) {
+        throw new Error('Failed to simulate route');
       }
+
+      routePreview = await response.json();
     } catch (error) {
       console.error('Failed to preview route:', error);
     } finally {
@@ -80,24 +112,34 @@
   async function createRoute() {
     try {
       const response = await authenticatedFetch(
-        'http://localhost:5000/routes/create',
+        'http://localhost:5000/routes',
         {
           method: 'POST',
           body: JSON.stringify({
             shipments: Array.from(selectedShipments).map((id) => ({
               id,
-              type: 'BOTH',
+              type: RouteOperationType.BOTH,
             })),
+            estimatedStartTime: new Date().toISOString(), // Add current time as start time
           }),
         },
       );
 
-      if (response.ok) {
-        selectedShipments.clear();
-        // Refresh data
+      if (!response.ok) {
+        throw new Error('Failed to create route');
       }
+
+      // Clear selection and preview
+      selectedShipments = new Set();
+      routePreview = null;
+
+      // Could add success notification here
+
+      // Refresh data (you might want to implement this)
+      // await refreshData();
     } catch (error) {
       console.error('Failed to create route:', error);
+      throw error; // Let RoutePreview component handle the error
     }
   }
 
@@ -105,11 +147,12 @@
     routePreview = null;
   }
 
-  function handleCreateRoute() {
-    createRoute();
+  async function handleCreateRoute() {
+    await createRoute();
   }
 
   $inspect(selectedShipments);
+  $inspect(currentZoom);
 </script>
 
 <svelte:head>
@@ -158,7 +201,7 @@
           {#if routePreview}
             <button
               class="bg-green-500 text-white px-4 py-2 rounded-full"
-              onclick={createRoute}
+              onclick={handleCreateRoute}
             >
               Create Route
             </button>
@@ -166,7 +209,7 @@
         </div>
 
         {#if routePreview}
-          <RoutePreview 
+          <RoutePreview
             {routePreview}
             onBack={handleBack}
             onCreate={handleCreateRoute}
@@ -204,3 +247,33 @@
     </div>
   {/if}
 </ListWrapper>
+
+{#if !routePreview}
+  {#each categories[selectedNav].data as shipment, index}
+    {@const isSelected = selectedShipments.has(Number(shipment.id))}
+    {@const color = isSelected
+      ? `var(--primary-${((index % 3) + 4) * 100})`
+      : 'var(--text-300)'}
+    {@const shiftX = currentZoom < 14 ? (index % 2) * 10 - 10 : 0}
+    {@const shiftY = currentZoom < 14 ? Math.floor(index / 2) * 10 - 10 : 0}
+
+    <Marker
+      onClick={() => toggleShipmentSelection(Number(shipment.id))}
+      location={shipment.pickup.location ?? { lng: 0, lat: 0 }}
+      name={String(index + 1)}
+      active={isSelected}
+      {color}
+      type="P"
+      offset={[shiftX, shiftY]}
+    />
+    <Marker
+      onClick={() => toggleShipmentSelection(Number(shipment.id))}
+      location={shipment.delivery.location ?? { lng: 0, lat: 0 }}
+      name={String(index + 1)}
+      active={isSelected}
+      {color}
+      type="D"
+      offset={[shiftX, shiftY]}
+    />
+  {/each}
+{/if}
