@@ -43,7 +43,7 @@ export class ShipmentsService {
       where: { canisterShipmentId: id },
       relations: [
         'shipper',
-        'assignedCarrier',
+        'carrier',
         'pickupAddress',
         'deliveryAddress',
       ],
@@ -247,7 +247,7 @@ export class ShipmentsService {
         'shipper',
         'pickupAddress',
         'deliveryAddress',
-        'assignedCarrier',
+        'carrier',
       ],
     });
 
@@ -272,8 +272,8 @@ export class ShipmentsService {
       },
       relations: [
         'shipper',
-        'assignedCarrier',
-        'route',
+        'carrier',
+        'carrier.user',
         'pickupAddress',
         'deliveryAddress',
       ],
@@ -285,7 +285,7 @@ export class ShipmentsService {
       ...this.toPendingShipmentResponseDto(shipment),
       assignedCarrier: shipment.carrier
         ? {
-            name: shipment.carrier.user.name,
+            name: shipment.carrier.user.name ?? 'Carrier',
             principal: shipment.carrier.principal,
           }
         : null,
@@ -388,7 +388,7 @@ export class ShipmentsService {
       relations: [
         'shipper',
         'carrier',
-        'route',
+        'carrier.user',
         'pickupAddress',
         'deliveryAddress',
       ],
@@ -398,7 +398,7 @@ export class ShipmentsService {
       ...this.toPendingShipmentResponseDto(shipment),
       assignedCarrier: shipment.carrier
         ? {
-            name: shipment.carrier.user.name,
+            name: shipment.carrier.user.name ?? 'Carrier',
             principal: shipment.carrier.principal,
           }
         : null,

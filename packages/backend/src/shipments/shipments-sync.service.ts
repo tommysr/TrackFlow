@@ -164,7 +164,6 @@ export class ShipmentsSyncService {
         relations: [
           'shipper',
           'carrier',
-          'route',
           'pickupAddress',
           'deliveryAddress',
         ],
@@ -267,6 +266,7 @@ export class ShipmentsSyncService {
 
     if (!icpUser) {
       icpUser = this.userRepository.create({
+        name: 'Carrier',
         principal: principal.toString(),
         roles: [UserRole.USER, UserRole.CARRIER],
       });

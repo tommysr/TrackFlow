@@ -102,6 +102,6 @@ export class Route {
   };
 
   // optional
-  // @OneToMany(() => RouteStop, stop => stop.route)
-  // stops: RouteStop[];
+  @OneToMany(() => RouteStop, stop => stop.route)
+  stops: RouteStop[];
 }

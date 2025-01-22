@@ -10,6 +10,7 @@ import { ConfigModule } from '@nestjs/config';
 import { RouteSegment } from './entities/routeSegment.entity';
 import { RouteStop } from './entities/routeStop.entity';
 import { Route } from './entities/route.entity';
+import { ShipmentsModule } from 'src/shipments/shipments.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { Route } from './entities/route.entity';
     forwardRef(() => AuthModule),
     CommonModule,
     ConfigModule,
+    forwardRef(() => ShipmentsModule),
   ],
   providers: [RoutesService],
   controllers: [RoutesController],

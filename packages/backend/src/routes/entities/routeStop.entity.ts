@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn, JoinColumn } from 'typeorm';
 import { Route } from './route.entity';
 import { Shipment } from '../../shipments/entities/shipment.entity';
 
@@ -13,7 +13,11 @@ export class RouteStop {
   // If a single stop corresponds to exactly one Shipment pickup or delivery:
   // guess i could do shipmentsRoutes table, but i dont think i need it
   @ManyToOne(() => Shipment, { nullable: false })
+  @JoinColumn({ name: 'shipmentId' })
   shipment: Shipment;
+
+  @Column('int')
+  shipmentId: number;
 
   @Column({
     type: 'enum',
