@@ -71,6 +71,8 @@ const configFactory = () => {
           database: configService.get('database.databaseName'),
           autoLoadEntities: true,
           synchronize: process.env.NODE_ENV == 'test',
+          migrationsRun: true,
+          migrations: [__dirname + '/migrations/*.{js,ts}'],
         };
       },
       inject: [ConfigService],

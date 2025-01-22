@@ -49,11 +49,9 @@ export interface RouteResponse {
 }
 
 export interface RouteSegment {
-  fromIndex: number;
-  toIndex: number;
   distance: number; // in meters
   duration: number; // in seconds
-  steps: RouteStep[]; // Updated to use RouteStep interface
+  geometry: RouteGeometry;
 }
 
 export interface RouteOptimizationResult {
@@ -63,9 +61,9 @@ export interface RouteOptimizationResult {
   segments: RouteSegment[];
   matrix: {
     durations: number[][]; // seconds
-    distances?: number[][]; // meters
+    distances: number[][]; // meters
   };
-  geometry?: RouteGeometry; // Add this to pass route geometry to frontend
+  geometry?: RouteGeometry; // pass route geometry to frontend
 }
 
 @Injectable()
@@ -184,8 +182,8 @@ export class RouteOptimizationService {
     );
 
     return {
-      durations: response.data.durations,
-      distances: response.data.distances,
+      durations: response.data.durations as number[][],
+      distances: response.data.distances as number[][],
     };
   }
 
@@ -208,27 +206,27 @@ export class RouteOptimizationService {
   }
 
   private extractSegments(routeData: RouteResponse): RouteSegment[] {
+    const fullCoordinates = routeData.features[0].geometry.coordinates;
     const segments: RouteSegment[] = [];
-    let currentIndex = 0;
-
-    routeData.features[0].properties.segments.forEach((segment: any) => {
+    
+    routeData.features[0].properties.segments.forEach((segment, index) => {
+      // Get start and end indices from way_points
+      const startIdx = segment.steps[0].way_points[0];
+      const endIdx = segment.steps[segment.steps.length - 1].way_points[1];
+      
+      // Extract coordinates for this segment
+      const segmentCoordinates = fullCoordinates.slice(startIdx, endIdx + 1);
+      
       segments.push({
-        fromIndex: currentIndex,
-        toIndex: currentIndex + segment.steps.length - 1,
         distance: segment.distance,
         duration: segment.duration,
-        steps: segment.steps.map((step: any) => ({
-          distance: step.distance,
-          duration: step.duration,
-          type: step.type,
-          instruction: step.instruction,
-          name: step.name,
-          way_points: step.way_points,
-        })),
+        geometry: {
+          type: 'LineString',
+          coordinates: segmentCoordinates
+        }
       });
-      currentIndex += segment.steps.length;
     });
-
+    
     return segments;
   }
 }

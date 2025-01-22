@@ -170,40 +170,62 @@ body {
     var(--primary)
   );
 }
+
+.marker-wrapper {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
 .pin {
   width: 30px;
   height: 30px;
   border-radius: 50% 50% 50% 0;
-  background: #00cae9;
+  background: var(--text-400);
   position: absolute;
-  transform: rotate(-45deg);
-  left: 50%;
-  top: 50%;
-  margin: -15px 0 0 -15px;
+  left: -15px;  // Half of width
+  top: -15px;   // Half of height
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   font-weight: bold;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  will-change: transform;  // Optimize for animations
+
+  .text {
+    transform: rotate(45deg);
+    color: white;
+    font-weight: bold;
+    font-size: 0.9em;
+  }
 
   &.active {
-    background: linear-gradient(45deg, #00cae9, #e95f8a);
+    background: var(--primary-500);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
   }
 
   &.inactive {
-    background: var(--secondary-200);
+    background: var(--text-300);
   }
 
-  &.carrier.inactive {
-    background: var(--primary-200);
+  &.pickup {
+    animation: bounce 0.5s ease-in-out infinite alternate;
+    background: var(--primary-400);
+    
+    &.active {
+      background: var(--primary-600);
+    }
   }
 
-  &.carrier.active {
-    background: var(--primary-600);
-  }
-
-  &.destination {
-    background: #f00;
+  &.delivery {
+    animation: pulse 1s ease-in-out infinite;
+    background: var(--secondary-400);
+    
+    &.active {
+      background: var(--secondary-600);
+    }
   }
 }
 
@@ -257,5 +279,17 @@ body {
 
   100% {
     transform: translateY(0) rotate(-45deg);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: rotate(-45deg) scale(1);
+  }
+  50% {
+    transform: rotate(-45deg) scale(1.2);
+  }
+  100% {
+    transform: rotate(-45deg) scale(1);
   }
 }

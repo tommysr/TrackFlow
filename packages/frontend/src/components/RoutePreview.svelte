@@ -1,48 +1,70 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { getContext, onDestroy } from 'svelte';
   import type { MapContext } from 'svelte-maplibre/dist/context';
-  import { LngLatBounds } from 'maplibre-gl';
-  export type RoutePreview = {
+  import { LngLatBounds, Marker as MapLibreMarker } from 'maplibre-gl';
+  import Marker from './Marker.svelte';
+  import { mount } from 'svelte';
+  import type { SvelteComponent } from 'svelte';
+
+  export type RouteSimulation = {
     shipments: Array<{
       pickupAddress: { latitude: number; longitude: number };
       deliveryAddress: { latitude: number; longitude: number };
     }>;
+    stops: Array<{
+      sequenceIndex: number;
+      stopType: 'PICKUP' | 'DELIVERY';
+      location: {
+        type: 'Point';
+        coordinates: [number, number];
+      };
+      estimatedArrival: string;
+      shipmentId: number;
+    }>;
     totalDistance: number;
     totalFuelCost: number;
     estimatedTime: number;
-    geometry: {
+    fullPath: {
+      type: 'LineString';
       coordinates: [number, number][];
-      type: string;
+    };
+    distanceMatrix?: {
+      durations: number[][];
+      distances: number[][];
     };
   };
 
-  let { routePreview, onBack, onCreate }: { routePreview: RoutePreview, onBack: () => void, onCreate: () => void } = $props();
+  let { routePreview, onBack, onCreate }: { 
+    routePreview: RouteSimulation, 
+    onBack: () => void, 
+    onCreate: () => Promise<void> 
+  } = $props();
+
+  let isCreating = $state(false);
+  let error: string | null = $state(null);
 
   let store = getContext<MapContext>(Symbol.for('svelte-maplibre')).map;
   let map = $derived<maplibregl.Map | null>($store);
+  let mapMarkers: MapLibreMarker[] = $state([]);
 
   // Watch for changes in routePreview and update map
   $effect(() => {
+    cleanupMap(); // Clean up first
     if (routePreview && map) {
-      updateMapDisplay();
+      createMapDisplay();
     }
   });
 
-  function updateMapDisplay() {
+  function createMapDisplay() {
     if (!map) return;
-    // Remove existing layers if they exist
-    if (map.getLayer('route')) map.removeLayer('route');
-    if (map.getLayer('route-points')) map.removeLayer('route-points');
-    if (map.getSource('route')) map.removeSource('route');
-    if (map.getSource('route-points')) map.removeSource('route-points');
 
     // Add route line
     map.addSource('route', {
       type: 'geojson',
       data: {
-        type: 'Feature',
+        type: 'Feature' as const,
         properties: {},
-        geometry: routePreview.geometry,
+        geometry: routePreview.fullPath,
       },
     });
 
@@ -61,74 +83,63 @@
       },
     });
 
-    // Add points
-    const points = routePreview.shipments.flatMap((shipment) => [
-      {
-        type: 'Feature',
-        properties: { type: 'pickup' },
-        geometry: {
-          type: 'Point',
-          coordinates: [
-            shipment.pickupAddress.longitude,
-            shipment.pickupAddress.latitude,
-          ],
-        },
-      },
-      {
-        type: 'Feature',
-        properties: { type: 'delivery' },
-        geometry: {
-          type: 'Point',
-          coordinates: [
-            shipment.deliveryAddress.longitude,
-            shipment.deliveryAddress.latitude,
-          ],
-        },
-      },
-    ]);
+    // Create markers
+    routePreview.stops.forEach((stop, i) => {
+      const el = document.createElement('div');
+      const color = `var(--secondary-${((i % 3) + 4) * 100})`;
 
-    map.addSource('route-points', {
-      type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features: points,
-      },
+      mount(Marker, {
+        target: el,
+        props: {
+          location: { lng: stop.location.coordinates[0], lat: stop.location.coordinates[1] },
+          name: `${stop.sequenceIndex}`,
+          onClick: () => {},
+          active: true,
+          color,
+          type: stop.stopType === 'PICKUP' ? 'P' : 'D'
+        }
+      });
+
+      // mapMarkers.push(marker);
     });
 
-    map.addLayer({
-      id: 'route-points',
-      type: 'circle',
-      source: 'route-points',
-      paint: {
-        'circle-radius': 8,
-        'circle-color': [
-          'match',
-          ['get', 'type'],
-          'pickup',
-          '#00ff00',
-          'delivery',
-          '#ff0000',
-          '#000000',
-        ],
-      },
-    });
-
-    // Fit map to show all points and route
+    // Fit bounds
     const bounds = new LngLatBounds();
-    routePreview.geometry.coordinates.forEach((coord) => bounds.extend(coord));
+    routePreview.fullPath.coordinates.forEach((coord) => bounds.extend(coord));
     map.fitBounds(bounds, { padding: 50 });
   }
 
-  function handleBack() {
-    // Clear route from map
+  function cleanupMap() {
+    // Remove all markers from the map
+    const markers = document.querySelectorAll('.pin');
+    markers.forEach(marker => marker.remove());
+    
+    // Clear route layer and source
     if (map) {
       if (map.getLayer('route')) map.removeLayer('route');
-      if (map.getLayer('route-points')) map.removeLayer('route-points');
       if (map.getSource('route')) map.removeSource('route');
-      if (map.getSource('route-points')) map.removeSource('route-points');
     }
+  }
+
+  async function handleCreate() {
+    try {
+      isCreating = true;
+      error = null;
+      await onCreate();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'An unknown error occurred';
+    } finally {
+      isCreating = false;
+    }
+  }
+
+  function handleBack() {
+    cleanupMap();
     onBack();
   }
+
+  // Ensure cleanup on component destroy
+  onDestroy(cleanupMap);
 </script>
 
 <div
@@ -157,21 +168,31 @@
       </div>
     </div>
 
+    {#if error}
+      <div class="text-red-500 text-center text-sm">{error}</div>
+    {/if}
+
     <div class="flex justify-center space-x-4">
       <button
         type="button"
         onclick={handleBack}
-        class="bg-gray-500 rounded-full px-7 py-2 text-white text-base transition ease-in-out hover:-translate-y-0.5 hover:scale-105 duration-200"
+        disabled={isCreating}
+        class="bg-gray-500 rounded-full px-7 py-2 text-white text-base transition ease-in-out hover:-translate-y-0.5 hover:scale-105 duration-200 disabled:opacity-50"
       >
         Back
       </button>
       <button
         type="button"
-        onclick={onCreate}
-        class="bg-gradient-to-r from-blue-500 to-rose-400 rounded-full px-7 py-2 text-white text-base transition ease-in-out hover:-translate-y-0.5 hover:scale-105 duration-200"
+        onclick={handleCreate}
+        disabled={isCreating}
+        class="bg-gradient-to-r from-blue-500 to-rose-400 rounded-full px-7 py-2 text-white text-base transition ease-in-out hover:-translate-y-0.5 hover:scale-105 duration-200 disabled:opacity-50 flex items-center space-x-2"
       >
-        Create Route
+        {#if isCreating}
+          <span class="animate-spin">⌛</span>
+        {/if}
+        <span>Create Route</span>
       </button>
     </div>
   </div>
 </div>
+

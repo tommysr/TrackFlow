@@ -15,10 +15,7 @@ import {
   PendingShipmentResponseDto,
 } from './dto/shipment-response.dto';
 import { ShipmentsSyncService } from './shipments-sync.service';
-import {
-  GeocodeAddressDto,
-  SetAddressDto,
-} from './dto/create-shipment.dto';
+import { GeocodeAddressDto, SetAddressDto } from './dto/create-shipment.dto';
 import { geocodeAddress } from '../utils/geocode.util';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
@@ -46,7 +43,7 @@ export class ShipmentsService {
       where: { canisterShipmentId: id },
       relations: [
         'shipper',
-        'assignedCarrier',
+        'carrier',
         'pickupAddress',
         'deliveryAddress',
       ],
@@ -62,18 +59,21 @@ export class ShipmentsService {
 
   async findByCarrier(principal: string): Promise<Shipment[]> {
     return this.shipmentRepository.find({
-      where: { assignedCarrier: { identity: { principal } } },
-      relations: ['locations', 'events'],
+      where: { carrier: { principal } },
+      relations: ['locations', 'carrier'],
     });
   }
 
-  async getAddresses(
-    shipmentId: number,
-  ): Promise<GeocodeResponseDto> {
+  async getAddresses(shipmentId: number): Promise<GeocodeResponseDto> {
     const shipment = await this.findOneById(shipmentId);
 
-    if (!shipment.pickupAddress.isComplete() || !shipment.deliveryAddress.isComplete()) {
-      throw new NotFoundException('Shipment does not have pickup or delivery addresses');
+    if (
+      !shipment.pickupAddress.isComplete() ||
+      !shipment.deliveryAddress.isComplete()
+    ) {
+      throw new NotFoundException(
+        'Shipment does not have pickup or delivery addresses',
+      );
     }
 
     return {
@@ -130,10 +130,7 @@ export class ShipmentsService {
       throw new NotFoundException('Shipment not found on ICP');
     }
 
-
-    if (
-      shipment.status == ShipmentStatus.BOUGHT_WITH_ADDRESS
-    ) {
+    if (shipment.status == ShipmentStatus.BOUGHT_WITH_ADDRESS) {
       throw new BadRequestException('Shipment addresses cant be changed');
     }
 
@@ -239,7 +236,7 @@ export class ShipmentsService {
   ): Promise<PendingShipmentResponseDto[]> {
     const shipments = await this.shipmentRepository.find({
       where: {
-        shipper: { identityId: principal },
+        shipper: { principal },
         status: In([
           ShipmentStatus.PENDING_WITH_ADDRESS,
           ShipmentStatus.PENDING_NO_ADDRESS,
@@ -250,7 +247,7 @@ export class ShipmentsService {
         'shipper',
         'pickupAddress',
         'deliveryAddress',
-        'assignedCarrier',
+        'carrier',
       ],
     });
 
@@ -267,7 +264,7 @@ export class ShipmentsService {
   ): Promise<BoughtShipmentResponseDto[]> {
     const shipments = await this.shipmentRepository.find({
       where: {
-        shipper: { identity: { principal } },
+        shipper: { principal },
         status: In([
           ShipmentStatus.BOUGHT_WITH_ADDRESS,
           ShipmentStatus.READY_FOR_PICKUP,
@@ -275,8 +272,8 @@ export class ShipmentsService {
       },
       relations: [
         'shipper',
-        'assignedCarrier',
-        'route',
+        'carrier',
+        'carrier.user',
         'pickupAddress',
         'deliveryAddress',
       ],
@@ -286,10 +283,10 @@ export class ShipmentsService {
 
     return shipments.map((shipment) => ({
       ...this.toPendingShipmentResponseDto(shipment),
-      assignedCarrier: shipment.assignedCarrier
+      assignedCarrier: shipment.carrier
         ? {
-            name: shipment.assignedCarrier.name,
-            principal: shipment.assignedCarrier.identityId,
+            name: shipment.carrier.user.name ?? 'Carrier',
+            principal: shipment.carrier.principal,
           }
         : null,
       estimatedPickupDate: shipment.estimatedPickupTime,
@@ -301,11 +298,11 @@ export class ShipmentsService {
     const shipment = await this.shipmentRepository.findOne({
       where: {
         canisterShipmentId: id,
-        shipper: { identity: { principal } },
+        shipper: { principal },
       },
       relations: [
         'shipper',
-        'assignedCarrier',
+        'carrier',
         'route',
         'pickupAddress',
         'deliveryAddress',
@@ -387,11 +384,11 @@ export class ShipmentsService {
     principal: string,
   ): Promise<BoughtShipmentResponseDto[]> {
     const shipments = await this.shipmentRepository.find({
-      where: { assignedCarrier: { identity: { principal } } },
+      where: { carrier: { principal } },
       relations: [
         'shipper',
-        'assignedCarrier',
-        'route',
+        'carrier',
+        'carrier.user',
         'pickupAddress',
         'deliveryAddress',
       ],
@@ -399,10 +396,10 @@ export class ShipmentsService {
 
     return shipments.map((shipment) => ({
       ...this.toPendingShipmentResponseDto(shipment),
-      assignedCarrier: shipment.assignedCarrier
+      assignedCarrier: shipment.carrier
         ? {
-            name: shipment.assignedCarrier.name,
-            principal: shipment.assignedCarrier.identityId,
+            name: shipment.carrier.user.name ?? 'Carrier',
+            principal: shipment.carrier.principal,
           }
         : null,
       estimatedPickupDate: shipment.estimatedPickupTime,

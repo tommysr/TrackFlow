@@ -7,7 +7,7 @@ import {
   Delegation,
   SignedDelegation,
 } from '@dfinity/identity';
-import { isIdentitySignatureValid } from '@slide-computer/signer/packages/signer-signatures/lib/cjs';
+import { isIdentitySignatureValid } from '@slide-computer/signer-signatures';
 import { ChallengeService } from '../services/challenge.service';
 
 interface IcpPayload {

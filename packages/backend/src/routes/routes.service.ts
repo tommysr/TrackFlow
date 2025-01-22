@@ -1,71 +1,134 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { Route } from '../aggregation/entities/route.entity';
+import { Route, RouteStatus } from './entities/route.entity';
+import { RouteStop } from './entities/routeStop.entity';
+import { RouteSegment } from './entities/routeSegment.entity';
 import { CreateRouteDto, RouteOperationType } from './dto/create-route.dto';
-import {
-  RouteOptimizationService,
-  Location,
-} from './route-optimization.service';
-import {
-  Shipment,
-  ShipmentStatus,
-} from '../shipments/entities/shipment.entity';
+import { RouteOptimizationService, Location } from './route-optimization.service';
+import { Shipment, ShipmentStatus } from '../shipments/entities/shipment.entity';
 import { Carrier } from '../carriers/entities/carrier.entity';
 import { IcpUser } from '../auth/entities/icp.user.entity';
-import { LocationService } from '../common/services/location.service';
-
-export interface RouteProgress {
-  completedStops: number;
-  remainingStops: number;
-  completedDistance: number;
-  remainingDistance: number;
-  isDelayed: boolean;
-  estimatedDelay?: number;
-  currentSpeed?: number;
-  estimatedArrivalTime?: Date;
-}
+import { RouteSimulation } from './dto/route-simulation.dto';
+import { UpdateRouteDto } from './dto/update-route.dto';
 
 @Injectable()
 export class RoutesService {
   constructor(
     @InjectRepository(Route)
-    private readonly routeRepository: Repository<Route>,
+    private readonly routeRepo: Repository<Route>,
+    @InjectRepository(RouteStop) 
+    private readonly routeStopRepo: Repository<RouteStop>,
+    @InjectRepository(RouteSegment)
+    private readonly routeSegmentRepo: Repository<RouteSegment>,
     @InjectRepository(Shipment)
-    private readonly shipmentRepository: Repository<Shipment>,
+    private readonly shipmentRepo: Repository<Shipment>,
     @InjectRepository(Carrier)
-    private readonly carrierRepository: Repository<Carrier>,
+    private readonly carrierRepo: Repository<Carrier>,
     private readonly routeOptimizationService: RouteOptimizationService,
-    private readonly locationService: LocationService,
   ) {}
-
-  async previewRoute(
-    createRouteDto: CreateRouteDto,
-    user: IcpUser,
-  ): Promise<Route> {
-    return this.calculateRoute(createRouteDto, user.principal);
-  }
 
   async createOptimizedRoute(
     createRouteDto: CreateRouteDto,
     user: IcpUser,
   ): Promise<Route> {
-    const route = await this.calculateRoute(createRouteDto, user.principal);
+    // 1. Validate shipments and carrier
+    const [shipments, carrier] = await Promise.all([
+      this.validateShipmentsStatusAndOwnership(createRouteDto, user.principal),
+      this.carrierRepo.findOneBy({ principal: user.principal }),
+    ]);
 
-    const savedRoute = await this.routeRepository.save(route);
+    if (!carrier) {
+      throw new BadRequestException('Carrier not found');
+    }
 
-    // Update shipments with calculated times and route association
-    await Promise.all(
-      route.shipments.map(async (shipment, index) => {
-        const estimatedTimes = this.calculateEstimatedTimes(route, index);
+    // 2. Collect locations and optimize route
+    const { locations } = this.collectLocationsWithTypes(createRouteDto, shipments);
+    const {
+      optimizedPoints,
+      totalDistance,
+      totalTime,
+      segments,
+      matrix,
+      geometry,
+    } = await this.routeOptimizationService.optimizeRoute(locations);
 
-        shipment.route = savedRoute;
-        shipment.estimatedPickupTime = estimatedTimes.pickup;
-        shipment.estimatedDeliveryTime = estimatedTimes.delivery;
+    // 3. Calculate route costs
+    const fuelConsumption = totalDistance / carrier.fuelEfficiency;
+    const totalFuelCost = fuelConsumption * carrier.fuelCostPerLiter;
 
-        return this.shipmentRepository.save(shipment);
-      }),
+    // 4. Create and save route entity
+    const route = this.routeRepo.create({
+      carrier,
+      totalDistance,
+      totalFuelCost,
+      fuelConsumption,
+      estimatedTime: totalTime,
+      date: createRouteDto.estimatedStartTime,
+      status: RouteStatus.PENDING,
+      fullPath: geometry ? {
+        type: 'LineString',
+        coordinates: geometry.coordinates,
+      } : undefined,
+      distanceMatrix: matrix,
+      metrics: {
+        progress: {
+          completedStops: 0,
+          totalStops: optimizedPoints.length,
+          completedDistance: 0,
+          remainingDistance: totalDistance,
+          isDelayed: false
+        }
+      }
+    });
+
+    const savedRoute = await this.routeRepo.save(route);
+
+    // 5. Create route stops for each optimized point
+    const routeStops = await Promise.all(
+      optimizedPoints.map(async (point, index) => {
+        const shipment = shipments.find(s => s.canisterShipmentId === point.shipmentId);
+        const estimatedTime = this.calculateStopEstimatedTime(savedRoute.date, savedRoute.distanceMatrix.durations, index);
+        
+        const routeStop = await this.routeStopRepo.save({
+          route: savedRoute,
+          shipment,
+          shipmentId: shipment.canisterShipmentId,
+          stopType: point.type === 'pickup' ? 'PICKUP' : 'DELIVERY',
+          sequenceIndex: index,
+          location: {
+            type: 'Point',
+            coordinates: [point.lng, point.lat]
+          },
+          estimatedArrival: estimatedTime
+        });
+
+        return routeStop;
+      })
     );
+
+    // 6. Create route segments between consecutive stops
+    if (segments) {
+      await Promise.all(
+        segments.map(async (segment, index) => {
+          if (index < routeStops.length - 1) {
+            await this.routeSegmentRepo.save({
+              route: savedRoute,
+              fromStop: routeStops[index],
+              toStop: routeStops[index + 1],
+              path: {
+                type: 'LineString',
+                coordinates: segment.geometry.coordinates
+              },
+              distance: segment.distance,
+              duration: segment.duration,
+              estimatedStartTime: routeStops[index]?.estimatedArrival,
+              estimatedEndTime: routeStops[index + 1]?.estimatedArrival
+            });
+          }
+        })
+      );
+    }
 
     return savedRoute;
   }
@@ -74,11 +137,11 @@ export class RoutesService {
     createRouteDto: CreateRouteDto,
     userPrincipal: string,
   ): Promise<Shipment[]> {
-    const shipments = await this.shipmentRepository.find({
+    const shipments = await this.shipmentRepo.find({
       where: {
         canisterShipmentId: In(createRouteDto.shipments.map((s) => s.id)),
       },
-      relations: ['assignedCarrier', 'pickupAddress', 'deliveryAddress'],
+      relations: ['carrier', 'pickupAddress', 'deliveryAddress'],
     });
 
     if (shipments.length !== createRouteDto.shipments.length) {
@@ -90,19 +153,15 @@ export class RoutesService {
     );
 
     if (!allShipmentsReady) {
-      throw new BadRequestException(
-        'Some shipments are not ready for processing',
-      );
+      throw new BadRequestException('Some shipments are not ready for processing');
     }
 
     const allShipmentsAreOwnedByCarrier = shipments.every(
-      (shipment) => shipment.assignedCarrier.identityId === userPrincipal,
+      (shipment) => shipment.carrier.principal === userPrincipal,
     );
 
     if (!allShipmentsAreOwnedByCarrier) {
-      throw new BadRequestException(
-        'Some shipments are not owned by the carrier',
-      );
+      throw new BadRequestException('Some shipments are not owned by the carrier');
     }
 
     return shipments;
@@ -116,116 +175,13 @@ export class RoutesService {
     );
   }
 
-  private async calculateRoute(
-    createRouteDto: CreateRouteDto,
-    userPrincipal: string,
-  ): Promise<Route> {
-    const shipments = await this.validateShipmentsStatusAndOwnership(
-      createRouteDto,
-      userPrincipal,
-    );
-
-    const carrier = await this.carrierRepository.findOne({
-      where: { identity: { principal: userPrincipal } },
-    });
-
-    if (!carrier) {
-      throw new BadRequestException('Carrier not found');
-    }
-
-    // Collect all locations and their types (pickup/delivery)
-    const { locations } = this.collectLocationsWithTypes(
-      createRouteDto,
-      shipments,
-    );
-
-    // Get optimized route with matrix
-    const {
-      optimizedPoints,
-      totalDistance,
-      totalTime,
-      segments,
-      matrix,
-      geometry,
-    } = await this.routeOptimizationService.optimizeRoute(locations);
-
-    // Calculate costs
-    const fuelEfficiency = carrier.fuelEfficiency || 10; // km/L
-    const fuelCostPerLiter = carrier.fuelCostPerLiter || 1.5; // currency/L
-    const fuelConsumption = totalDistance / fuelEfficiency;
-    const totalFuelCost = fuelConsumption * fuelCostPerLiter;
-
-    const route = this.routeRepository.create({
-      carrier,
-      optimizedPoints,
-      segments,
-      distanceMatrix: matrix,
-      totalDistance,
-      totalFuelCost,
-      estimatedTime: totalTime,
-      date: new Date(),
-      shipments,
-      fuelConsumption,
-      isCompleted: false,
-      metrics: {
-        progress: {
-          completedStops: 0,
-          totalStops: locations.length,
-          completedDistance: 0,
-          remainingDistance: totalDistance,
-          isDelayed: false,
-        },
-      },
-      geometry,
-    });
-
-    return route;
-  }
-
-  private calculateEstimatedTimes(
-    route: Route,
-    shipmentIndex: number,
-  ): {
-    pickup: Date;
-    delivery: Date;
-  } {
-    const startTime = new Date(route.date);
-    let currentTime = startTime.getTime();
-
-    const pickupIndex = route.segments.findIndex((s) =>
-      s.steps.some((step) => step.way_points[0] === shipmentIndex * 2),
-    );
-    const deliveryIndex = route.segments.findIndex((s) =>
-      s.steps.some((step) => step.way_points[0] === shipmentIndex * 2 + 1),
-    );
-
-    // Calculate time to pickup
-    for (let i = 0; i < pickupIndex; i++) {
-      currentTime += route.segments[i].duration * 1000;
-    }
-
-    const pickupTime = new Date(currentTime);
-
-    // Calculate time to delivery
-    for (let i = pickupIndex; i < deliveryIndex; i++) {
-      currentTime += route.segments[i].duration * 1000;
-    }
-
-    const deliveryTime = new Date(currentTime);
-
-    return { pickup: pickupTime, delivery: deliveryTime };
-  }
-
   private collectLocationsWithTypes(
     createRouteDto: CreateRouteDto,
     shipments: Shipment[],
-  ): {
-    locations: Location[];
-  } {
+  ): { locations: Location[] } {
     const locations: Location[] = [];
 
-    createRouteDto.shipments.forEach((shipmentOp, index) => {
-      // TODO: This is a hack to get the shipment by id. We should use the shipment id directly.
+    createRouteDto.shipments.forEach((shipmentOp) => {
       const shipment = shipments.find(
         (s) => Number(s.canisterShipmentId) === shipmentOp.id,
       );
@@ -258,5 +214,140 @@ export class RoutesService {
     });
 
     return { locations };
+  }
+
+  private calculateStopEstimatedTime(
+    startTime: Date,
+    durations: number[][],
+    stopIndex: number
+  ): Date {
+    const LOADING_TIME = 15 * 60; // 15 minutes in seconds
+    const startTimeMs = new Date(startTime).getTime();
+    
+    if (stopIndex === 0) return new Date(startTimeMs);
+    
+    let cumulativeDuration = 0;
+    for (let i = 0; i < stopIndex; i++) {
+      cumulativeDuration += durations[i][i + 1] + LOADING_TIME;
+    }
+    
+    return new Date(startTimeMs + (cumulativeDuration * 1000));
+  }
+
+  // Simulate route without saving (previously previewRoute)
+  async simulateRoute(
+    createRouteDto: CreateRouteDto,
+    user: IcpUser,
+  ): Promise<RouteSimulation> {
+    const [shipments, carrier] = await Promise.all([
+      this.validateShipmentsStatusAndOwnership(createRouteDto, user.principal),
+      this.carrierRepo.findOneBy({ principal: user.principal }),
+    ]);
+
+    if (!carrier) {
+      throw new BadRequestException('Carrier not found');
+    }
+
+    const { locations } = this.collectLocationsWithTypes(createRouteDto, shipments);
+    const optimizationResult = await this.routeOptimizationService.optimizeRoute(locations);
+
+    // Create optimized points array with sequence information
+    const { optimizedPoints } = optimizationResult;
+    
+    // Map optimized points back to stops
+    const stops = optimizedPoints.map((point, index) => {
+      const shipment = shipments.find(s => s.canisterShipmentId === point.shipmentId);
+      return {
+        shipmentId: shipment.canisterShipmentId,
+        stopType: point.type === 'pickup' ? ('PICKUP' as const) : ('DELIVERY' as const),
+        sequenceIndex: index,
+        location: {
+          type: 'Point' as const,
+          coordinates: [point.lng, point.lat] as [number, number]
+        },
+        estimatedArrival: this.calculateStopEstimatedTime(
+          createRouteDto.estimatedStartTime,
+          optimizationResult.matrix?.durations || [],
+          index
+        )
+      };
+    });
+
+    return {
+      shipments: shipments.map(shipment => ({
+        pickupAddress: shipment.pickupAddress,
+        deliveryAddress: shipment.deliveryAddress
+      })),
+      stops,
+      totalDistance: optimizationResult.totalDistance,
+      totalFuelCost: (optimizationResult.totalDistance / carrier.fuelEfficiency) * carrier.fuelCostPerLiter,
+      estimatedTime: optimizationResult.totalTime,
+      fullPath: optimizationResult.geometry ? {
+        type: 'LineString' as const,
+        coordinates: optimizationResult.geometry.coordinates,
+      } : undefined,
+      distanceMatrix: optimizationResult.matrix,
+    };
+  }
+
+  // Find all routes for a user
+  async findAllByUser(user: IcpUser): Promise<Route[]> {
+    return this.routeRepo.find({
+      where: { carrier: { principal: user.principal } },
+      relations: ['carrier'],
+      order: { date: 'DESC' }
+    });
+  }
+
+  // Find specific route for a user
+  async findOneByUser(id: string, user: IcpUser): Promise<Route> {
+    const route = await this.routeRepo.findOne({
+      where: { id, carrier: { principal: user.principal } },
+      relations: ['carrier', 'stops', 'stops.shipment']
+    });
+
+    if (!route) {
+      throw new NotFoundException(`Route #${id} not found`);
+    }
+
+    return route;
+  }
+
+  // Update route (mainly status updates)
+  async update(
+    id: string, 
+    updateRouteDto: UpdateRouteDto,
+    user: IcpUser
+  ): Promise<Route> {
+    const route = await this.findOneByUser(id, user);
+    
+    // Validate status transition
+    if (updateRouteDto.status) {
+      this.validateStatusTransition(route.status, updateRouteDto.status);
+    }
+
+    Object.assign(route, updateRouteDto);
+    return this.routeRepo.save(route);
+  }
+
+  // Delete route
+  async remove(id: string, user: IcpUser): Promise<void> {
+    const route = await this.findOneByUser(id, user);
+    await this.routeRepo.remove(route);
+  }
+
+  private validateStatusTransition(currentStatus: RouteStatus, newStatus: RouteStatus) {
+    const validTransitions = {
+      [RouteStatus.PENDING]: [RouteStatus.ACTIVE, RouteStatus.CANCELLED],
+      [RouteStatus.ACTIVE]: [RouteStatus.COMPLETED, RouteStatus.CANCELLED],
+      [RouteStatus.COMPLETED]: [],
+      [RouteStatus.CANCELLED]: [],
+    };
+
+    if (!validTransitions[currentStatus].includes(newStatus)) {
+      throw new BadRequestException(
+        `Cannot transition from ${currentStatus} to ${newStatus}`
+      );
+    }
   }
 }

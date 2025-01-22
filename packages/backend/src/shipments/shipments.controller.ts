@@ -88,7 +88,9 @@ export class ShipmentsController {
 
 
   @Get('my-carried')
-  @UseGuards(ShipmentSyncGuard)
+  // @UseGuards(ShipmentSyncGuard)
+  // @Roles(UserRole.CARRIER, UserRole.ADMIN)
+  // @UseGuards(ShipmentGuard)
   async getMyCarriedShipments(
     @User() user: IcpUser,
   ): Promise<BoughtShipmentResponseDto[]> {

@@ -11,19 +11,25 @@ export enum UserRole {
 
 @Entity()
 export class IcpUser {
-  @PrimaryColumn({ unique: true })
+  @PrimaryColumn()
   principal: string;
 
   @Column({
-    type: 'enum',
+    type: 'simple-array',
     enum: UserRole,
-    default: UserRole.USER,
+    default: [UserRole.USER],
   })
-  role: UserRole;
+  roles: UserRole[];
 
-  @OneToOne(() => Shipper, (shipper) => shipper.identity, { nullable: true })
-  shipper: Shipper;
+  @Column({ nullable: true })
+  name: string;
 
-  @OneToOne(() => Carrier, (carrier) => carrier.identity, { nullable: true })
-  carrier: Carrier;
+  @Column({ nullable: true })
+  contact: string;
+
+  // @OneToOne(() => Shipper, (shipper) => shipper.identity, { nullable: true })
+  // shipper: Shipper;
+
+  // @OneToOne(() => Carrier, (carrier) => carrier.identity, { nullable: true })
+  // carrier: Carrier;
 }

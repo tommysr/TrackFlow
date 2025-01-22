@@ -10,12 +10,11 @@ export class GPSData {
   @Index()
   carrier: Carrier;
 
-  @Column('decimal', { precision: 9, scale: 6 })
-  latitude: number;
-
-  @Column('decimal', { precision: 9, scale: 6 })
-  longitude: number;
-
+  @Column('geometry', { 
+    spatialFeatureType: 'Point', 
+    srid: 4326 
+  })
+  location: object;
   @Column('timestamp')
   @Index()
   timestamp: Date;

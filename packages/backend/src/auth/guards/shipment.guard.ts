@@ -46,13 +46,13 @@ export class ShipmentGuard implements CanActivate {
       return true;
     }
 
-    this.logger.log(`Checking if user ${user.principal} is assigned to carrier ${shipment.shipper.identity}`);
+    this.logger.log(`Checking if user ${user.principal} is assigned to carrier ${shipment.shipper.principal}`);
 
-    if (requiredRoles.includes(UserRole.SHIPPER) && shipment.shipper.identityId === user.principal) {
+    if (requiredRoles.includes(UserRole.SHIPPER) && shipment.shipper.principal === user.principal) {
       return true;
     }
 
-    if (requiredRoles.includes(UserRole.CARRIER) && shipment.assignedCarrier?.identity.principal === user.principal) {
+    if (requiredRoles.includes(UserRole.CARRIER) && shipment.carrier?.principal === user.principal) {
       return true;
     }
 

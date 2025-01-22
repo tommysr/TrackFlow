@@ -5,12 +5,13 @@ import { Shipment } from 'src/shipments/entities/shipment.entity';
 @Entity()
 export class Shipper {
   @PrimaryColumn()
-  identityId: string;
+  principal: string;
 
-  @OneToOne(() => IcpUser)
-  @JoinColumn({ name: 'identityId' })
-  identity: IcpUser;
+  // this refers to the principal of the shipper
+  @OneToOne(() => IcpUser, {nullable: false})
+  @JoinColumn({ name: 'principal' })
+  user: IcpUser;
 
-  @OneToMany(() => Shipment, (shipment) => shipment.shipper)
+  @OneToMany(() => Shipment, (s) => s.shipper)
   shipments: Shipment[];
 } 

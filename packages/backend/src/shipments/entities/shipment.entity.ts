@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, UpdateDateColumn, Cr
 import { Carrier } from 'src/carriers/entities/carrier.entity';
 import { Address } from './address.entity';
 import { Shipper } from 'src/auth/entities/shipper.entity';
-import { Route } from 'src/aggregation/entities/route.entity';
+// import { Route } from 'src/aggregation/entities/route.entity';
 
 export enum ShipmentStatus {
   // Initial states
@@ -28,14 +28,14 @@ export class Shipment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @PrimaryColumn('bigint')
+  @Column('bigint', {unique: true})
   canisterShipmentId: number;
 
   @ManyToOne(() => Shipper, (shipper) => shipper.shipments, { nullable: false })
   shipper: Shipper;
 
-  @ManyToOne(() => Carrier, (carrier) => carrier.carriedShipments, { nullable: true })
-  assignedCarrier: Carrier;
+  @ManyToOne(() => Carrier, (carrier) => carrier.shipments, { nullable: true })
+  carrier: Carrier;
 
   @Column({ type: 'enum', enum: ShipmentStatus, default: ShipmentStatus.PENDING_NO_ADDRESS })
   status: ShipmentStatus;
@@ -87,8 +87,8 @@ export class Shipment {
   @Column('timestamp', { nullable: true })
   pickupDate: Date;
 
-  @ManyToOne(() => Route, (route) => route.shipments, { nullable: true })
-  route: Route;
+  // @ManyToOne(() => Route, (route) => route.shipments, { nullable: true })
+  // route: Route;
 
   @Column('jsonb', { nullable: true })
   lastRouteSegment: { lat: number; lng: number }[];
