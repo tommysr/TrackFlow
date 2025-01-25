@@ -1,8 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, UpdateDateColumn, CreateDateColumn, JoinColumn, OneToOne, PrimaryColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, UpdateDateColumn, CreateDateColumn, JoinColumn, OneToOne, PrimaryColumn, OneToMany } from 'typeorm';
 import { Carrier } from 'src/carriers/entities/carrier.entity';
 import { Address } from './address.entity';
 import { Shipper } from 'src/auth/entities/shipper.entity';
 import { Transform } from 'class-transformer';
+import { ShipmentRouteHistory } from 'src/routes/entities/shipment-route-history.entity';
 // import { Route } from 'src/aggregation/entities/route.entity';
 
 export enum ShipmentStatus {
@@ -83,12 +84,8 @@ export class Shipment {
   @Column('timestamp', { nullable: true })
   pickupDate: Date;
 
-  // @ManyToOne(() => Route, (route) => route.shipments, { nullable: true })
-  // route: Route;
-
   @Column('jsonb', { nullable: true })
   lastRouteSegment: { lat: number; lng: number }[];
-
 
   @Column({ nullable: true })
   trackingToken: string;
@@ -104,4 +101,7 @@ export class Shipment {
 
   @Column('timestamp', { nullable: true })
   deliveryWindowEnd?: Date;
+
+  @OneToMany(() => ShipmentRouteHistory, history => history.shipment)
+  routeHistory: ShipmentRouteHistory[];
 } 

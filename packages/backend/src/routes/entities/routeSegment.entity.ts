@@ -12,7 +12,7 @@ export class RouteSegment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Route, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Route, route => route.segments, { onDelete: 'CASCADE' })
   route: Route;
 
   // fromStop & toStop define which stops are connected:
@@ -35,8 +35,14 @@ export class RouteSegment {
   duration: number; // in minutes (or seconds if you prefer)
 
   @Column('timestamp', { nullable: true })
-  estimatedStartTime: Date;
+  estimatedStartTime?: Date;
 
   @Column('timestamp', { nullable: true })
-  estimatedEndTime: Date;
+  estimatedEndTime?: Date;
+
+  @Column('timestamp', { nullable: true })
+  actualStartTime?: Date;
+
+  @Column('timestamp', { nullable: true })
+  actualEndTime?: Date;
 }

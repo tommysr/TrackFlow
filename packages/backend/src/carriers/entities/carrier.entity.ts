@@ -4,6 +4,7 @@ import { IcpUser } from 'src/auth/entities/icp.user.entity';
 import { Shipment } from 'src/shipments/entities/shipment.entity';
 import { GPSData } from '../../gps/entities/gps-data.entity';
 import { Route } from 'src/routes/entities/route.entity';
+import { CarrierConfiguration } from 'src/carriers/entities/carrier-configuration.entity';
 
 @Entity()
 export class Carrier {
@@ -14,11 +15,8 @@ export class Carrier {
   @JoinColumn({ name: 'principal' })
   user: IcpUser;
 
-  @Column('float', { default: 12 }) // km per liter
-  fuelEfficiency: number;
-
-  @Column('float', { default: 1.5 }) // currency per liter
-  fuelCostPerLiter: number;
+  @OneToOne(() => CarrierConfiguration, config => config.carrier, { cascade: true })
+  configuration: CarrierConfiguration;
 
   @OneToMany(() => Route, (r) => r.carrier)
   routes: Route[];
