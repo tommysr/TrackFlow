@@ -11,18 +11,22 @@ import { RouteSegment } from './entities/routeSegment.entity';
 import { RouteStop } from './entities/routeStop.entity';
 import { Route } from './entities/route.entity';
 import { ShipmentsModule } from 'src/shipments/shipments.module';
+import { Shipment } from 'src/shipments/entities/shipment.entity';
+import { CarriersModule } from 'src/carriers/carriers.module';
+import { RouteOptimizationService } from './route-optimization.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Route, RouteStop, RouteSegment ]),
+    TypeOrmModule.forFeature([Route, RouteStop, RouteSegment, Shipment]),
     forwardRef(() => CoreModule),
     forwardRef(() => AuthModule),
     CommonModule,
     ConfigModule,
+    CarriersModule,
     forwardRef(() => ShipmentsModule),
   ],
-  providers: [RoutesService],
+  providers: [RoutesService, RouteOptimizationService],
   controllers: [RoutesController],
-  exports: [RoutesService],
+  exports: [RoutesService, RouteOptimizationService],
 })
 export class RoutesModule {} 

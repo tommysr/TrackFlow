@@ -1,29 +1,28 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn, JoinColumn } from 'typeorm';
 import { Route } from './route.entity';
 import { Shipment } from '../../shipments/entities/shipment.entity';
+import { StopType } from '../route-optimization.service';
 
 @Entity()
 export class RouteStop {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Route, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Route, route => route.stops, { onDelete: 'CASCADE' })
   route: Route;
 
-  // If a single stop corresponds to exactly one Shipment pickup or delivery:
-  // guess i could do shipmentsRoutes table, but i dont think i need it
-  @ManyToOne(() => Shipment, { nullable: false })
+  @ManyToOne(() => Shipment, { nullable: true })
   @JoinColumn({ name: 'shipmentId' })
-  shipment: Shipment;
+  shipment?: Shipment;
 
-  @Column('int')
-  shipmentId: number;
+  @Column({ nullable: true })
+  shipmentId?: string;
 
   @Column({
     type: 'enum',
-    enum: ['PICKUP', 'DELIVERY'],
+    enum: StopType,
   })
-  stopType: 'PICKUP' | 'DELIVERY';
+  stopType: StopType;
 
   @Column('int')
   sequenceIndex: number;

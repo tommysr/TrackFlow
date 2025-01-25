@@ -1,44 +1,43 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsNumber, ValidateNested } from 'class-validator';
+import { IsArray, IsNumber, ValidateNested, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { LocationDto } from 'src/common/dto/location.dto';
 
-class GeoPoint {
-  @ApiProperty()
-  @IsNumber()
-  latitude: number;
-
-  @ApiProperty()
-  @IsNumber()
-  longitude: number;
+export enum StopType {
+  PICKUP = 'PICKUP',
+  DELIVERY = 'DELIVERY',
+  START = 'START',
+  END = 'END'
 }
 
-class ShipmentLocation {
-  @ApiProperty({ type: GeoPoint })
+export class ShipmentLocation {
+  @ApiProperty({ type: LocationDto })
   @ValidateNested()
-  @Type(() => GeoPoint)
-  pickupAddress: GeoPoint;
+  @Type(() => LocationDto)
+  pickupAddress: LocationDto;
 
-  @ApiProperty({ type: GeoPoint })
+  @ApiProperty({ type: LocationDto })
   @ValidateNested()
-  @Type(() => GeoPoint)
-  deliveryAddress: GeoPoint;
+  @Type(() => LocationDto)
+  deliveryAddress: LocationDto;
 }
 
-class RouteStop {
+export class RouteStop {
   @ApiProperty()
   @IsNumber()
   sequenceIndex: number;
 
-  @ApiProperty({ enum: ['PICKUP', 'DELIVERY'] })
-  stopType: 'PICKUP' | 'DELIVERY';
+  @ApiProperty({ enum: StopType })
+  @IsEnum(StopType)
+  stopType: StopType;
+
+  @ApiProperty({ type: LocationDto })
+  @ValidateNested()
+  @Type(() => LocationDto)
+  location: LocationDto;
 
   @ApiProperty()
-  location: {
-    type: 'Point';
-    coordinates: [number, number];
-  };
-
-  @ApiProperty()
+  @Type(() => Date)
   estimatedArrival: Date;
 }
 

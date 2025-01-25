@@ -10,8 +10,9 @@ import {
 } from 'typeorm';
 import { Shipment } from '../../shipments/entities/shipment.entity';
 import { Carrier } from '../../carriers/entities/carrier.entity';
-import { RouteSegment } from '../../routes/route-optimization.service';
+import { RouteSegment } from './routeSegment.entity';
 import { RouteStop } from './routeStop.entity';
+import { Transform } from 'class-transformer';
 
 export enum RouteStatus {
   PENDING = 'pending', // Route created but not started
@@ -29,17 +30,21 @@ export class Route {
   carrier: Carrier;
 
   @Column('decimal', { precision: 10, scale: 2 })
+  @Transform(({ value }) => Number(value))
   totalDistance: number; // in kilometers
 
   // @Column('decimal', { precision: 10, scale: 2 })
   // totalProfit: number; // in currency
   @Column('decimal', { precision: 10, scale: 2 })
+  @Transform(({ value }) => Number(value))
   totalFuelCost: number; // in currency
 
   @Column('decimal', { precision: 10, scale: 2 })
+  @Transform(({ value }) => Number(value))
   fuelConsumption: number; // in liters
 
   @Column('decimal', { precision: 10, scale: 2 })
+  @Transform(({ value }) => Number(value))
   estimatedTime: number; // in minutes
 
   // @Column('decimal', { precision: 10, scale: 6, nullable: true })
@@ -69,6 +74,13 @@ export class Route {
 
   @Column('timestamp', { nullable: true })
   lastLocationUpdate: Date;
+
+  @Column('geometry', {
+    spatialFeatureType: 'Point',
+    srid: 4326,
+    nullable: true,
+  })
+  lastLocation?: object;
 
   // Store full route path for complete visualization
   @Column('geometry', {
@@ -102,6 +114,15 @@ export class Route {
   };
 
   // optional
-  @OneToMany(() => RouteStop, stop => stop.route)
+  @OneToMany(() => RouteStop, stop => stop.route, { cascade: true })
   stops: RouteStop[];
+
+  @OneToMany(() => RouteSegment, segment => segment.route, { cascade: true })
+  segments: RouteSegment[];
+
+  @Column({ type: 'timestamp', nullable: true })
+  startedAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  completedAt: Date;
 }

@@ -1,6 +1,6 @@
-import { IsArray, ValidateNested, IsEnum, IsNumber, IsDateString } from 'class-validator';
+import { IsArray, ValidateNested, IsEnum, IsNumber, IsDateString, IsOptional, IsBoolean, IsString } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { LocationDto } from 'src/shipments/dto/create-shipment.dto';
+import { LocationDto } from 'src/common/dto/location.dto';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum RouteOperationType {
@@ -9,10 +9,11 @@ export enum RouteOperationType {
   BOTH = 'both'
 }
 
-class ShipmentOperation {
+
+export class ShipmentOperationDto {
   @ApiProperty()
-  @IsNumber()
-  id: number;
+  @IsString()
+  id: string;
 
   @ApiProperty({ enum: RouteOperationType })
   @IsEnum(RouteOperationType)
@@ -20,15 +21,20 @@ class ShipmentOperation {
 }
 
 export class CreateRouteDto {
-  @ApiProperty({ type: [ShipmentOperation] })
+  @ApiProperty({ type: [ShipmentOperationDto] })
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => ShipmentOperation)
-  shipments: ShipmentOperation[];
+  @Type(() => ShipmentOperationDto)
+  shipments: ShipmentOperationDto[];
 
   @ValidateNested()
   @Type(() => LocationDto)
-  carrierLocation: LocationDto;
+  startLocation: LocationDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocationDto)
+  endLocation?: LocationDto;
 
   @ApiProperty()
   @IsDateString()
