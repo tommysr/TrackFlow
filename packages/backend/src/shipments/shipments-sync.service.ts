@@ -14,6 +14,7 @@ import { Carrier } from 'src/carriers/entities/carrier.entity';
 import { Shipper } from '../auth/entities/shipper.entity';
 import { Principal } from '@dfinity/principal';
 import { Address } from './entities/address.entity';
+import { ShipmentSequence } from './entities/shipment-sequence.entity';
 
 const host = `http://localhost:4943`;
 
@@ -39,7 +40,6 @@ export function isBoughtEvent(
 @Injectable()
 export class ShipmentsSyncService {
   private readonly logger = new Logger(ShipmentsSyncService.name);
-  private lastProcessedSequence = BigInt(0);
   private isProcessing = false;
 
   constructor(
@@ -51,21 +51,49 @@ export class ShipmentsSyncService {
     private readonly carrierRepository: Repository<Carrier>,
     @InjectRepository(Shipper)
     private readonly shipperRepository: Repository<Shipper>,
-    @InjectRepository(Address)
-    private readonly addressRepository: Repository<Address>,
+    @InjectRepository(ShipmentSequence)
+    private readonly sequenceRepository: Repository<ShipmentSequence>,
   ) {}
 
+  private async getLastProcessedSequence(): Promise<bigint> {
+    let sequence = await this.sequenceRepository.findOne({
+      where: { id: 'shipment_sequence' },
+    });
+
+    if (!sequence) {
+      sequence = this.sequenceRepository.create({
+        lastProcessedSequence: '0',
+      });
+      await this.sequenceRepository.save(sequence);
+    }
+
+    return BigInt(sequence.lastProcessedSequence);
+  }
+
+  private async updateLastProcessedSequence(sequence: bigint): Promise<void> {
+    await this.sequenceRepository.update(
+      { id: 'shipment_sequence' },
+      {
+        lastProcessedSequence: sequence.toString(),
+        lastUpdated: new Date(),
+      },
+    );
+  }
+
   async pullEvents() {
-    if (this.isProcessing) return;
+    if (this.isProcessing) {
+      this.logger.debug('Already processing events, skipping...');
+      return;
+    }
 
     try {
       this.isProcessing = true;
       this.logger.debug('Starting to pull events...');
 
+      const lastProcessedSequence = await this.getLastProcessedSequence();
+
       // Get new events from canister
-      const events = await anonymousBackend.getEvents([
-        this.lastProcessedSequence,
-      ]);
+      const events = await anonymousBackend.getEvents([lastProcessedSequence]);
       this.logger.debug(`Received ${events.length} events from canister`);
 
       for (const timestampedEvent of events) {
@@ -73,7 +101,7 @@ export class ShipmentsSyncService {
           `Processing event from timestamped event: ${Number(timestampedEvent.timestamp)}`,
         );
         await this.processEvent(timestampedEvent.event);
-        this.lastProcessedSequence = timestampedEvent.sequence;
+        await this.updateLastProcessedSequence(timestampedEvent.sequence);
       }
     } catch (error) {
       this.logger.error('Failed to pull events:', error);
@@ -100,23 +128,16 @@ export class ShipmentsSyncService {
   ): Promise<void> {
     const carrier = await this.syncCarrier(carrierPrincipal);
     shipment.carrier = carrier;
-
-    // Update status based on address completion
-    if (
-      !shipment.pickupAddress.isComplete() ||
-      !shipment.deliveryAddress.isComplete()
-    ) {
-      shipment.status = ShipmentStatus.BOUGHT_NO_ADDRESS;
-    } else {
-      shipment.status = ShipmentStatus.BOUGHT_WITH_ADDRESS;
-    }
+    shipment.status = ShipmentStatus.BOUGHT;
   }
 
   private async handleCarrierAssigned(event: {
     CarrierAssigned: { shipment_id: bigint; carrier: Principal };
   }) {
     const shipment = await this.shipmentRepository.findOne({
-      where: { canisterShipmentId: Number(event.CarrierAssigned.shipment_id) },
+      where: {
+        canisterShipmentId: event.CarrierAssigned.shipment_id.toString(),
+      },
     });
 
     if (!shipment) {
@@ -137,7 +158,7 @@ export class ShipmentsSyncService {
     );
 
     const shipment = await this.shipmentRepository.findOne({
-      where: { canisterShipmentId: Number(event.Created.shipment_id) },
+      where: { canisterShipmentId: event.Created.shipment_id.toString() },
     });
 
     if (!shipment) {
@@ -160,13 +181,8 @@ export class ShipmentsSyncService {
 
       // Find existing shipment or create new one
       let shipment = await this.shipmentRepository.findOne({
-        where: { canisterShipmentId: Number(canisterShipment.id) },
-        relations: [
-          'shipper',
-          'carrier',
-          'pickupAddress',
-          'deliveryAddress',
-        ],
+        where: { canisterShipmentId: canisterShipment.id.toString() },
+        relations: ['shipper', 'carrier', 'pickupAddress', 'deliveryAddress'],
       });
 
       if (!shipment) {
@@ -174,24 +190,9 @@ export class ShipmentsSyncService {
           'Creating new shipment with pickup and delivery addresses',
         );
 
-        // Create addresses with ICP coordinates
-        const pickupAddress = this.addressRepository.create({
-          icpLat: canisterShipment.info.source.lat,
-          icpLng: canisterShipment.info.source.lng,
-        });
-
-        const deliveryAddress = this.addressRepository.create({
-          icpLat: canisterShipment.info.destination.lat,
-          icpLng: canisterShipment.info.destination.lng,
-        });
-
-        await this.addressRepository.save([pickupAddress, deliveryAddress]);
-
         shipment = this.shipmentRepository.create({
-          canisterShipmentId: Number(canisterShipment.id),
-          status: ShipmentStatus.PENDING_NO_ADDRESS,
-          pickupAddress,
-          deliveryAddress,
+          canisterShipmentId: canisterShipment.id.toString(),
+          status: ShipmentStatus.PENDING,
           value: Number(canisterShipment.info.value),
           price: Number(canisterShipment.info.price),
           size: this.getSizeCategory(canisterShipment.info.size_category),
