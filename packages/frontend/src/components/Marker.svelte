@@ -1,48 +1,51 @@
 <script lang="ts">
-	import { Marker } from 'svelte-maplibre';
-	import { type Coords } from '../lib/common';
-    import clsx from 'clsx';
+  import { Marker } from 'svelte-maplibre';
+  import { type Coords } from '../lib/common';
+  import clsx from 'clsx';
 
-	let {
-		location,
-		onClick = () => {},
-		name = '',
-		active = false,
-		color = undefined,
-		type = undefined,
-		offset = [0, 0]
-	}: {
-		location: Coords;
-		onClick: () => void;
-		name: string | undefined;
-		active?: boolean;
-		color?: string;
-		type?: 'P' | 'D';
-		offset?: [number, number];
-	} = $props();
+  let {
+    location,
+    onClick = () => {},
+    name = '',
+    active = false,
+    color = undefined,
+    type = undefined,
+    offset = [0, 0],
+  }: {
+    location: Coords;
 
-	let style = $derived(`
+    name: string | undefined;
+    active?: boolean;
+    color?: string;
+    onClick?: () => void;
+    type?: 'P' | 'D' | 'S' | 'E' | 'C';
+    offset?: [number, number];
+  } = $props();
+
+  let style = $derived(`
 		background: ${color || '#888888'};
 	`);
-	let displayText = $derived(`${name}${type ? `-${type}` : ''}`);
-	let markerClass = $derived(clsx(
-		'pin',
-		active && 'active',
-		type === 'P' && 'pickup',
-		type === 'D' && 'delivery'
-	));
+  let displayText = $derived(`${name}${type ? `-${type}` : ''}`);
+  let markerClass = $derived(
+    clsx(
+      'pin',
+      active && 'active',
+      type === 'P' && 'pickup',
+      type === 'D' && 'delivery',
+      type === 'S' && 'start',
+      type === 'E' && 'end',
+      type === 'C' && 'carrier',
+    ),
+  );
 
-	$inspect(offset);
+  $inspect(offset);
 </script>
 
-<Marker 
-	bind:lngLat={location} 
-	on:click={onClick}
-	offset={offset}
->
-	<div class="marker-wrapper">
-		<div class={markerClass} {style}>
-			<span class="text">{displayText}</span>
-		</div>
-	</div>
+<Marker bind:lngLat={location} on:click={onClick} {offset}>
+  <div class="marker-wrapper">
+    <div class={markerClass} {style}>
+      <span class="text">{displayText}</span>
+    </div>
+  </div>
 </Marker>
+

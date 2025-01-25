@@ -4,22 +4,20 @@ import type {
 } from '../../../declarations/canister/canister.did';
 
 export type BackendStatus =
-  | 'PENDING_NO_ADDRESS'
-  | 'PENDING_WITH_ADDRESS'
-  | 'BOUGHT_NO_ADDRESS'
-  | 'BOUGHT_WITH_ADDRESS'
-  | 'READY_FOR_PICKUP'
+  | 'PENDING'
+  | 'BOUGHT'
+  | 'ROUTE_SET'
   | 'PICKED_UP'
   | 'IN_TRANSIT'
   | 'DELIVERED'
   | 'CANCELLED';
 
-export  interface AddressResponse {
-  street?: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-  country?: string;
+export interface AddressResponse {
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
 }
 
 export interface LocationResponse {
@@ -27,10 +25,8 @@ export interface LocationResponse {
   lng: number;
 }
 
-export interface AddressLocationResponse {
-  address: AddressResponse | null;
-  location: LocationResponse | null;
-  isComplete: boolean;
+export interface AddressLocationResponse extends LocationResponse {
+  address: AddressResponse;
 }
 
 export interface CarrierResponse {
@@ -42,22 +38,29 @@ export interface CarrierResponse {
 export interface BaseShipmentResponse {
   canisterShipmentId: string; // fix this to be bigint/number
   status: BackendStatus;
-  value: string; // fix this to be number
-  price: string; // fix this to be number
+  value: number; // fix this to be number
+  price: number; // fix this to be number
 }
 
 // Pending shipments
 export interface PendingShipmentResponse extends BaseShipmentResponse {
-  pickup: AddressLocationResponse;
-  delivery: AddressLocationResponse;
+  pickup?: AddressLocationResponse;
+  delivery?: AddressLocationResponse;
   trackingToken?: string;
+}
+
+export interface TimeWindow {
+  start: Date;
+  end: Date;
 }
 
 // Bought shipments
 export interface BoughtShipmentResponse extends PendingShipmentResponse {
+  assignedCarrier: CarrierResponse;
   estimatedPickupDate?: Date;
   estimatedDeliveryDate?: Date;
-  assignedCarrier: CarrierResponse;
+  pickupTimeWindow?: TimeWindow;
+  deliveryTimeWindow?: TimeWindow;
 }
 
 // In transit shipments
@@ -113,7 +116,10 @@ export function isBoughtShipment(
 export function isInTransitShipment(
   shipment: PendingShipment | BoughtShipment | InTransitShipment,
 ): shipment is InTransitShipment {
-  return (shipment as InTransitShipment).status === 'IN_TRANSIT' || shipment.status === 'PICKED_UP';
+  return (
+    (shipment as InTransitShipment).status === 'IN_TRANSIT' ||
+    shipment.status === 'PICKED_UP'
+  );
 }
 
 export enum RouteOperationType {
@@ -124,5 +130,5 @@ export enum RouteOperationType {
 
 export interface ShipmentRouteOperation {
   type: RouteOperationType;
-  id: number;
+  id: string;
 }

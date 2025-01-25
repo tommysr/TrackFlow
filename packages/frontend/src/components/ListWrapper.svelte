@@ -64,7 +64,7 @@
 </div>
 
 <div
-  class="absolute hidden md:flex justify-center md:w-1/3 xl:w-1/4 2xl:w-1/5 right-7 top-32 z-10 rounded-3xl h-3/4 px-1 py-5 shadow-xl bg-background"
+  class="absolute hidden md:flex justify-center md:w-4/9 xl:w-1/3 2xl:w-1/4 right-7 top-32 z-10 rounded-3xl h-3/4 px-1 py-5 shadow-xl bg-background"
 >
   {@render children()}
 </div>
