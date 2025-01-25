@@ -15,8 +15,8 @@
       sequenceIndex: number;
       stopType: 'PICKUP' | 'DELIVERY';
       location: {
-        type: 'Point';
-        coordinates: [number, number];
+        lng: number;
+        lat: number;
       };
       estimatedArrival: string;
       shipmentId: number;
@@ -86,17 +86,17 @@
     // Create markers
     routePreview.stops.forEach((stop, i) => {
       const el = document.createElement('div');
-      const color = `var(--secondary-${((i % 3) + 4) * 100})`;
+      const color = getStopColor(stop.stopType);
 
       mount(Marker, {
         target: el,
         props: {
-          location: { lng: stop.location.coordinates[0], lat: stop.location.coordinates[1] },
-          name: `${stop.sequenceIndex}`,
+          location: { lng: stop.location.lng, lat: stop.location.lat },
+          name: String(stop.sequenceIndex + 1),
           onClick: () => {},
           active: true,
           color,
-          type: stop.stopType === 'PICKUP' ? 'P' : 'D'
+          type: getMarkerType(stop.stopType)
         }
       });
 
@@ -136,6 +136,36 @@
   function handleBack() {
     cleanupMap();
     onBack();
+  }
+
+  function getStopColor(stopType: string) {
+    switch(stopType) {
+      case 'PICKUP':
+        return 'var(--primary-500)';
+      case 'DELIVERY':
+        return 'var(--secondary-500)';
+      case 'START':
+        return 'var(--accent-500)';
+      case 'END':
+        return 'var(--accent-200)';
+      default:
+        return 'var(--primary-200)';
+    }
+  }
+
+  function getMarkerType(stopType: string): 'P' | 'D' | 'S' | 'E' {
+    switch(stopType) {
+      case 'PICKUP':
+        return 'P';
+      case 'DELIVERY':
+        return 'D';
+      case 'START':
+        return 'S';
+      case 'END':
+        return 'E';
+      default:
+        return 'P';
+    }
   }
 
   // Ensure cleanup on component destroy

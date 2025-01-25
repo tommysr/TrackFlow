@@ -28,11 +28,15 @@ export const load: PageLoad = async ({
       const backendCarriedShipments: Array<BoughtShipmentResponse> =
         await response.json();
 
+      console.log(backendCarriedShipments);
+
       myBoughtShipments = icpCarrier
         .map((shipment) => {
           const backendData = backendCarriedShipments.find(
-            (bs) => bs.canisterShipmentId === shipment.id.toString(),
+            (bs) => bs.canisterShipmentId.toString() === shipment.id.toString(),
           );
+
+          console.log(backendData);
 
           if (!backendData) {
             return null;
@@ -47,6 +51,8 @@ export const load: PageLoad = async ({
             assignedCarrier: backendData.assignedCarrier,
             estimatedPickupDate: backendData.estimatedPickupDate,
             estimatedDeliveryDate: backendData.estimatedDeliveryDate,
+            pickupTimeWindow: backendData.pickupTimeWindow,
+            deliveryTimeWindow: backendData.deliveryTimeWindow,
           };
         })
         .filter((shipment) => shipment !== null);

@@ -6,6 +6,7 @@
   import SendIcon from './SendIcon.svelte';
   import { wallet } from '$src/lib/wallet.svelte';
   import Button from './Button.svelte';
+  import { locationTracking } from '$src/lib/stores/locationTracking.svelte';
 
   let apiConnected = $state(false);
   let currentPage = $derived($page.url.pathname);
@@ -14,7 +15,18 @@
     { label: 'Home', href: '/', Component: HomeIcon },
     { label: 'Shippers', href: '/map/shippers', Component: Box },
     { label: 'Drivers', href: '/map/drivers', Component: TruckIcon },
-    { label: 'Track', href: '/map/track', Component: SendIcon },
+    { 
+      label: 'Track', 
+      Component: SendIcon,
+      isToggle: true,
+      onClick: () => {
+        if (locationTracking.isTracking) {
+          locationTracking.stopTracking();
+        } else {
+          locationTracking.startTracking();
+        }
+      }
+    },
   ]);
 
   export async function fetchChallenge(): Promise<{ sessionId: string; challenge: string }> {
@@ -80,21 +92,26 @@
     class="fixed left-6 w-10 bg-white rounded-full top-1/2 transform -translate-y-1/2 py-1.5 px-7 shadow-lg z-10 bg-white"
   >
     <div class="flex flex-col items-center justify-center space-y-3">
-      {#each navigationItems as { label, href, Component }}
+      {#each navigationItems as item}
         <div
           class={clsx(
-            'flex flex-col justify-center items-center space-y-4 rounded-full  p-3 z-20',
-            currentPage == href ? 'bg-secondary-200' : '',
+            'flex flex-col justify-center items-center space-y-4 rounded-full p-3 z-20',
+            item.isToggle && locationTracking.isTracking ? 'bg-green-200' :
+            currentPage == item.href ? 'bg-secondary-200' : '',
           )}
         >
           <div class={clsx('group relative')}>
-            <a {href}>
-              <Component />
-            </a>
-            <span
-              class="opacity-0 group-hover:opacity-100 duration-300 bg-white absolute left-12 -top-2 p-2 rounded-lg shadow"
-            >
-              {label}
+            {#if item.isToggle}
+              <button onclick={item.onClick}>
+                <item.Component />
+              </button>
+            {:else}
+              <a href={item.href}>
+                <item.Component />
+              </a>
+            {/if}
+            <span class="opacity-0 group-hover:opacity-100 duration-300 bg-white absolute left-12 -top-2 p-2 rounded-lg shadow">
+              {item.label} {item.isToggle ? locationTracking.isTracking ? '(On)' : '(Off)' : ''}
             </span>
           </div>
         </div>
@@ -165,28 +182,39 @@
     <div></div>
     <nav class="">
       <ul class="flex h-3/4 flex-col items-center space-y-12">
-        {#each navigationItems as { label, href }}
-          {#if label !== 'Track'}
-            <div
-              class={clsx(
-                'p-5 rounded-xl flex flex-col justify-center items-center',
-                currentPage == href ? 'bg-primary-100' : 'p-20',
-              )}
-            >
+        {#each navigationItems as item}
+          <div
+            class={clsx(
+              'p-5 rounded-xl flex flex-col justify-center items-center',
+              item.isToggle && locationTracking.isTracking ? 'bg-green-200' :
+              currentPage == item.href ? 'bg-primary-100' : 'p-20',
+            )}
+          >
+            {#if item.isToggle}
+              <button 
+                onclick={item.onClick}
+                class={clsx(
+                  'text-2xl',
+                  locationTracking.isTracking ? 'text-green-600' : ''
+                )}
+              >
+                {item.label} {locationTracking.isTracking ? '(On)' : '(Off)'}
+              </button>
+            {:else}
               <a
-                {href}
+                href={item.href}
                 onclick={() => (isNavbarOpen = false)}
                 class={clsx(
                   'text-2xl',
-                  currentPage === href
+                  currentPage === item.href
                     ? 'bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent'
                     : '',
                 )}
               >
-                {label}
+                {item.label}
               </a>
-            </div>
-          {/if}
+            {/if}
+          </div>
         {/each}
       </ul>
     </nav>
