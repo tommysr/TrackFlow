@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, Param, Put, Delete, Query } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Param, Put, Delete, Query, ClassSerializerInterceptor, UseInterceptors } from '@nestjs/common';
 import { RoutesService } from './routes.service';
 import { CreateRouteDto } from './dto/create-route.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
@@ -11,12 +11,20 @@ import { RouteSimulation } from './dto/route-simulation.dto';
 import { ShipmentGuard } from 'src/auth/guards/shipment.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { ShipmentSyncGuard } from 'src/auth/guards/shipment.sync.guard';
+import { UpdateLocationDto } from './dto/update-location.dto';
+import { RouteTrackingService } from '../core/services/route-tracking.service';
+import { RouteStop } from './entities/routeStop.entity';
+import { Shipment } from 'src/shipments/entities/shipment.entity';
 
 @ApiTags('routes')
 @Controller('routes')
 @UseGuards(JwtAuthGuard)
+@UseInterceptors(ClassSerializerInterceptor)
 export class RoutesController {
-  constructor(private readonly routesService: RoutesService) {}
+  constructor(
+    private readonly routesService: RoutesService,
+    private readonly routeTrackingService: RouteTrackingService
+  ) {}
 
   @Post('simulate')
   // @Roles(UserRole.CARRIER, UserRole.ADMIN)
@@ -31,15 +39,15 @@ export class RoutesController {
     return this.routesService.simulateRoute(createRouteDto, user);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get route by id' })
-  @ApiResponse({ status: 200, type: Route })
-  async getRoute(
-    @User() user: IcpUser,
-    @Param('id') id: string
-  ): Promise<Route> {
-    return this.routesService.findOneByUser(id, user);
-  }
+  // @Get(':id')
+  // @ApiOperation({ summary: 'Get route by id' })
+  // @ApiResponse({ status: 200, type: Route })
+  // async getRoute(
+  //   @User() user: IcpUser,
+  //   @Param('id') id: string
+  // ): Promise<Route> {
+  //   return this.routesService.findOneByUser(id, user);
+  // }
 
   @Post()
   @ApiOperation({ summary: 'Create optimized route' })
@@ -77,5 +85,38 @@ export class RoutesController {
     @Param('id') id: string
   ): Promise<void> {
     return this.routesService.remove(id, user);
+  }
+
+  @Post(':id/activate')
+  @Roles(UserRole.CARRIER)
+  async activateRoute(
+    @Param('id') id: string,
+    @User() user: IcpUser,
+  ): Promise<Route> {
+    return this.routesService.activateRoute(id, user.principal);
+  }
+
+  @Get('active')
+  @Roles(UserRole.CARRIER)
+  async getActiveRoute(
+    @User() user: IcpUser,
+  ): Promise<Route | null> {
+    return this.routesService.getActiveRoute(user.principal);
+  }
+
+  @Post('active/location')
+  @Roles(UserRole.CARRIER)
+  async updateLocation(
+    @User() user: IcpUser,
+    @Body() updateLocationDto: UpdateLocationDto
+  ): Promise<{
+    updatedRoute: Route;
+    updatedStops: RouteStop[];
+    updatedShipments: Shipment[];
+  }> {
+    return this.routeTrackingService.updateCarrierLocation(
+      user.principal,
+      updateLocationDto,
+    );
   }
 }

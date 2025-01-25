@@ -2,11 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 
+export enum StopType {
+  PICKUP = 'PICKUP',
+  DELIVERY = 'DELIVERY',
+  START = 'START',
+  END = 'END',
+}
+
 export interface Location {
   lat: number;
   lng: number;
-  type: 'pickup' | 'delivery';
-  shipmentId: number;
+  type: StopType;
+  shipmentId?: string;
 }
 
 export interface RouteStep {
@@ -80,17 +87,22 @@ export class RouteOptimizationService {
   async optimizeRoute(locations: Location[]): Promise<RouteOptimizationResult> {
     try {
       const matrix = await this.getDistanceMatrix(locations);
+      console.log('matrix', matrix);
+      
+      // Ensure start location is first in the optimization
       const optimizedOrder = this.calculateOptimalOrderWithConstraints(
         matrix.durations,
         locations,
       );
+      console.log('optimizedOrder', optimizedOrder);
       const orderedLocations = optimizedOrder.map((i) => locations[i]);
       const route = await this.getDetailedRoute(orderedLocations);
+      console.log('route', route);
       const segments = this.extractSegments(route.data);
+      
       return {
         optimizedPoints: orderedLocations,
-        totalDistance:
-          route.data.features[0].properties.summary.distance / 1000,
+        totalDistance: route.data.features[0].properties.summary.distance / 1000,
         totalTime: route.data.features[0].properties.summary.duration / 60,
         segments,
         matrix: {
@@ -113,43 +125,48 @@ export class RouteOptimizationService {
     const visited = new Set<number>();
     const order: number[] = [];
 
+    // Find start location index
+    const startIndex = locations.findIndex(loc => loc.type === 'START');
+    if (startIndex !== -1) {
+      visited.add(startIndex);
+      order.push(startIndex);
+    }
+
     // Create a map of shipment IDs to their pickup/delivery indices
     const shipments = new Map<number, { pickup: number; delivery: number }>();
     locations.forEach((loc, idx) => {
-      if (loc.type === 'pickup') {
-        shipments.set(loc.shipmentId, { pickup: idx, delivery: -1 });
-      } else {
-        const shipment = shipments.get(loc.shipmentId);
+      if (loc.type === 'PICKUP' && loc.shipmentId) {
+        shipments.set(Number(loc.shipmentId), { pickup: idx, delivery: -1 });
+      } else if (loc.type === 'DELIVERY' && loc.shipmentId) {
+        const shipment = shipments.get(Number(loc.shipmentId));
         if (shipment) {
           shipment.delivery = idx;
         }
       }
     });
 
-    let current = 0; // Start position
+    // Find end location index
+    const endIndex = locations.findIndex(loc => loc.type === 'END');
 
-    while (visited.size < n) {
+    while (visited.size < n - (endIndex !== -1 ? 1 : 0)) {
       let bestNext = -1;
       let bestDuration = Infinity;
+      const current = order[order.length - 1];
 
       // Try all unvisited locations as next point
       for (let i = 0; i < n; i++) {
-        if (visited.has(i)) continue;
+        if (visited.has(i) || i === endIndex) continue;
 
         const location = locations[i];
-        const shipment = shipments.get(location.shipmentId);
-
-        // Skip if this is a delivery and its pickup hasn't been visited yet
-        if (location.type === 'delivery' && !visited.has(shipment.pickup)) {
-          continue;
+        if (location.shipmentId) {
+          const shipment = shipments.get(Number(location.shipmentId));
+          // Skip if this is a delivery and its pickup hasn't been visited yet
+          if (location.type === 'DELIVERY' && !visited.has(shipment.pickup)) {
+            continue;
+          }
         }
 
-        // Calculate duration to this point
-        const durationToPoint =
-          current === 0
-            ? durations[0][i]
-            : durations[order[order.length - 1]][i];
-
+        const durationToPoint = durations[current][i];
         if (durationToPoint < bestDuration) {
           bestDuration = durationToPoint;
           bestNext = i;
@@ -157,10 +174,13 @@ export class RouteOptimizationService {
       }
 
       if (bestNext === -1) break;
-
       visited.add(bestNext);
       order.push(bestNext);
-      current = bestNext;
+    }
+
+    // Add end location last if it exists
+    if (endIndex !== -1) {
+      order.push(endIndex);
     }
 
     return order;
@@ -187,7 +207,9 @@ export class RouteOptimizationService {
     };
   }
 
-  private async getDetailedRoute(locations: Location[]) {
+  async getDetailedRoute(locations: Location[]) {
+    console.log('locations', locations);
+    console.log('this.routingApiKey', this.routingApiKey);
     return axios.post(
       `${this.baseUrl}/directions/driving-car/geojson`,
       {
