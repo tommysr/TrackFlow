@@ -15,6 +15,8 @@ import { UpdateLocationDto } from './dto/update-location.dto';
 import { RouteTrackingService } from '../core/services/route-tracking.service';
 import { RouteStop } from './entities/routeStop.entity';
 import { Shipment } from 'src/shipments/entities/shipment.entity';
+import { RouteDelay } from './entities/route-delay.entity';
+import { RouteMetrics } from './entities/route-metrics.entity';
 
 @ApiTags('routes')
 @Controller('routes')
@@ -112,11 +114,53 @@ export class RoutesController {
   ): Promise<{
     updatedRoute: Route;
     updatedStops: RouteStop[];
-    updatedShipments: Shipment[];
+    delays: RouteDelay[];
   }> {
     return this.routeTrackingService.updateCarrierLocation(
       user.principal,
       updateLocationDto,
     );
   }
+
+  @Get('active/metrics')
+  @Roles(UserRole.CARRIER)
+  async getActiveRouteMetrics(
+    @User() user: IcpUser,
+  ): Promise<{
+    route: Route;
+    metrics: RouteMetrics;
+    nextStop?: RouteStop;
+    remainingStops: RouteStop[];
+  }> {
+    return this.routesService.getActiveRouteMetrics(user.principal);
+  }
+
+  @Get('active/progress')
+  @Roles(UserRole.CARRIER)
+  async getRouteProgress(
+    @User() user: IcpUser,
+  ): Promise<{
+    completedStops: number;
+    totalStops: number;
+    completedDistance: number;
+    remainingDistance: number;
+    isDelayed: boolean;
+    delayMinutes?: number;
+    nextStopEta?: Date;
+  }> {
+    return this.routesService.getRouteProgress(user.principal);
+  }
+
+  // @Get(':id/delays')
+  // @ApiOperation({ summary: 'Get route delay history' })
+  // async getRouteDelays(
+  //   @Param('id') routeId: string,
+  //   @Query() query: {
+  //     from?: Date;
+  //     to?: Date;
+  //     stopId?: string;
+  //   },
+  // ): Promise<RouteDelay[]> {
+  //   return this.routesService.getDelayHistory(routeId, query);
+  // }
 }

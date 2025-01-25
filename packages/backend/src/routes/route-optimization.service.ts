@@ -1,68 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
+import { LocationDto } from '../common/dto/location.dto';
+import { StopType, GeoLineString } from './types/location.types';
+import { OpenRouteResponse } from './types/openroute.types';
 
-export enum StopType {
-  PICKUP = 'PICKUP',
-  DELIVERY = 'DELIVERY',
-  START = 'START',
-  END = 'END',
-}
-
-export interface Location {
-  lat: number;
-  lng: number;
+export interface OptimizationLocation extends LocationDto {
   type: StopType;
   shipmentId?: string;
 }
 
-export interface RouteStep {
-  distance: number;
-  duration: number;
-  type: number;
-  instruction: string;
-  name: string;
-  way_points: number[]; // Changed from wayPoints to match API response
-}
-
-export interface RouteGeometry {
-  coordinates: [number, number][]; // Array of [longitude, latitude] pairs
-  type: string;
-}
-
-export interface RouteFeature {
-  bbox: number[];
-  type: string;
-  properties: {
-    segments: {
-      distance: number;
-      duration: number;
-      steps: RouteStep[];
-    }[];
-    way_points: number[];
-    summary: {
-      distance: number;
-      duration: number;
-    };
-  };
-  geometry: RouteGeometry;
-}
-
-export interface RouteResponse {
-  type: string;
-  bbox: number[];
-  features: RouteFeature[];
-  metadata: any;
-}
-
-export interface RouteSegment {
-  distance: number; // in meters
-  duration: number; // in seconds
-  geometry: RouteGeometry;
-}
-
 export interface RouteOptimizationResult {
-  optimizedPoints: Location[];
+  optimizedPoints: OptimizationLocation[];
   totalDistance: number; // kilometers
   totalTime: number; // minutes
   segments: RouteSegment[];
@@ -70,7 +19,13 @@ export interface RouteOptimizationResult {
     durations: number[][]; // seconds
     distances: number[][]; // meters
   };
-  geometry?: RouteGeometry; // pass route geometry to frontend
+  geometry?: GeoLineString;
+}
+
+export interface RouteSegment {
+  distance: number; // in meters
+  duration: number; // in seconds
+  geometry: GeoLineString;
 }
 
 @Injectable()
@@ -81,10 +36,9 @@ export class RouteOptimizationService {
 
   constructor(private configService: ConfigService) {
     this.routingApiKey = this.configService.get('routing.apiKey');
-    console.log('this.routingApiKey', this.routingApiKey);
   }
 
-  async optimizeRoute(locations: Location[]): Promise<RouteOptimizationResult> {
+  async optimizeRoute(locations: OptimizationLocation[]): Promise<RouteOptimizationResult> {
     try {
       const matrix = await this.getDistanceMatrix(locations);
       console.log('matrix', matrix);
@@ -96,6 +50,7 @@ export class RouteOptimizationService {
       );
       console.log('optimizedOrder', optimizedOrder);
       const orderedLocations = optimizedOrder.map((i) => locations[i]);
+      console.log('orderedLocations', orderedLocations);
       const route = await this.getDetailedRoute(orderedLocations);
       console.log('route', route);
       const segments = this.extractSegments(route.data);
@@ -119,7 +74,7 @@ export class RouteOptimizationService {
 
   private calculateOptimalOrderWithConstraints(
     durations: number[][],
-    locations: Location[],
+    locations: OptimizationLocation[],
   ): number[] {
     const n = locations.length;
     const visited = new Set<number>();
@@ -186,7 +141,7 @@ export class RouteOptimizationService {
     return order;
   }
 
-  private async getDistanceMatrix(locations: Location[]) {
+  private async getDistanceMatrix(locations: OptimizationLocation[]) {
     const response = await axios.post(
       `${this.baseUrl}/matrix/driving-car`,
       {
@@ -207,10 +162,11 @@ export class RouteOptimizationService {
     };
   }
 
-  async getDetailedRoute(locations: Location[]) {
+  async getDetailedRoute(locations: OptimizationLocation[]) {
     console.log('locations', locations);
-    console.log('this.routingApiKey', this.routingApiKey);
-    return axios.post(
+    console.log(this.routingApiKey);
+    console.log('locations', locations.map((loc) => [loc.lng, loc.lat]));
+    return axios.post<OpenRouteResponse>(
       `${this.baseUrl}/directions/driving-car/geojson`,
       {
         coordinates: locations.map((loc) => [loc.lng, loc.lat]),
@@ -227,28 +183,26 @@ export class RouteOptimizationService {
     );
   }
 
-  private extractSegments(routeData: RouteResponse): RouteSegment[] {
-    const fullCoordinates = routeData.features[0].geometry.coordinates;
-    const segments: RouteSegment[] = [];
-    
-    routeData.features[0].properties.segments.forEach((segment, index) => {
-      // Get start and end indices from way_points
+  private extractSegments(response: OpenRouteResponse) {
+    const route = response.features[0];
+    const segments = route.properties.segments;
+    const coordinates = route.geometry.coordinates;
+
+    return segments.map(segment => {
+      // Use way_points to get the correct coordinate indices
       const startIdx = segment.steps[0].way_points[0];
       const endIdx = segment.steps[segment.steps.length - 1].way_points[1];
       
-      // Extract coordinates for this segment
-      const segmentCoordinates = fullCoordinates.slice(startIdx, endIdx + 1);
+      const segmentCoordinates = coordinates.slice(startIdx, endIdx + 1);
       
-      segments.push({
+      return {
         distance: segment.distance,
         duration: segment.duration,
         geometry: {
-          type: 'LineString',
+          type: 'LineString' as const,
           coordinates: segmentCoordinates
         }
-      });
+      };
     });
-    
-    return segments;
   }
 }

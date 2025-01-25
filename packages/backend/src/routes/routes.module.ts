@@ -14,10 +14,24 @@ import { ShipmentsModule } from 'src/shipments/shipments.module';
 import { Shipment } from 'src/shipments/entities/shipment.entity';
 import { CarriersModule } from 'src/carriers/carriers.module';
 import { RouteOptimizationService } from './route-optimization.service';
+import { RouteMetrics } from './entities/route-metrics.entity';
+import { RouteDistanceMatrix } from './entities/route-distance-matrix.entity';
+import { ShipmentRouteHistory } from './entities/shipment-route-history.entity';
+
+export * from './types/location.types';
+export * from './types/openroute.types';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Route, RouteStop, RouteSegment, Shipment]),
+    TypeOrmModule.forFeature([
+      Route, 
+      RouteStop, 
+      RouteSegment, 
+      Shipment, 
+      RouteMetrics,
+      RouteDistanceMatrix,
+      ShipmentRouteHistory,
+    ]),
     forwardRef(() => CoreModule),
     forwardRef(() => AuthModule),
     CommonModule,

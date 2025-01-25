@@ -286,8 +286,10 @@ export class ShipmentsSyncService {
     if (!carrier) {
       carrier = this.carrierRepository.create({
         user: icpUser,
-        fuelEfficiency: 12,
-        fuelCostPerLiter: 1.5,
+        configuration: {
+          fuelEfficiency: 12,
+          fuelCostPerLiter: 1.5,
+        },
       });
       await this.carrierRepository.save(carrier);
     }
