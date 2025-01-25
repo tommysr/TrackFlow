@@ -11,12 +11,28 @@ import { RoutesModule } from 'src/routes/routes.module';
 import { CommonModule } from 'src/common/common.module';
 import { GPSModule } from 'src/gps/gps.module';
 import { CoreModule } from 'src/core/core.module';
+import { CarriersModule } from 'src/carriers/carriers.module';
+import { RouteStop } from 'src/routes/entities/routeStop.entity';
+import { IcpUser } from '../auth/entities/icp.user.entity';
+import { Carrier } from '../carriers/entities/carrier.entity';
+import { Shipper } from '../auth/entities/shipper.entity';
+import { ShipmentSequence } from './entities/shipment-sequence.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Shipment, GPSData, Address]),
+    TypeOrmModule.forFeature([
+      Shipment,
+      GPSData,
+      Address,
+      RouteStop,
+      IcpUser,
+      Carrier,
+      Shipper,
+      ShipmentSequence,
+    ]),
     CoreModule,
     GPSModule,
+    CarriersModule,
     forwardRef(() => AuthModule),
     forwardRef(() => RoutesModule),
     forwardRef(() => CommonModule),

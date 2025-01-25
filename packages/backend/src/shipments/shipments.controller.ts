@@ -2,13 +2,13 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Param,
   Body,
   UseGuards,
-  Logger,
+
 } from '@nestjs/common';
 import { ShipmentsService } from './shipments.service';
-
 import { ShipmentGuard } from '../auth/guards/shipment.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { IcpUser, UserRole } from '../auth/entities/icp.user.entity';
@@ -21,52 +21,81 @@ import {
 } from './dto/shipment-response.dto';
 import { GeocodeAddressDto, SetAddressDto } from './dto/create-shipment.dto';
 import { ShipmentSyncGuard } from 'src/auth/guards/shipment.sync.guard';
-import { GetAddressesDto } from './dto/get-addresses.dto';
+import { ShipmentWindowsDto } from './dto/time-window.dto';
+import { SetStopDateDto } from './dto/set-stop-date.dto';
 
 @Controller('shipments')
 @UseGuards(JwtAuthGuard)
 export class ShipmentsController {
-  private readonly logger = new Logger(ShipmentsController.name);
-
   constructor(private readonly shipmentsService: ShipmentsService) {}
 
-  // Create a shipment, only shipper
-  @Post('set-addresses')
-  @Roles(UserRole.SHIPPER)
-  @UseGuards(ShipmentSyncGuard)
+  @Get('/by-canister-id/:id')
   @UseGuards(ShipmentGuard)
-  async setAddresses(
-    @Body() setAddressDto: SetAddressDto,
-  ): Promise<{trackingToken: string}> {
-    return this.shipmentsService.setAddress(setAddressDto);
+  async getByCanisterId(@Param('id') id: string) {
+    return this.shipmentsService.findOneById(id);
   }
 
+  // Create a shipment with addresses
+  @Post('create')
+  @UseGuards(ShipmentGuard)
+  @UseGuards(ShipmentSyncGuard)
+  @Roles(UserRole.SHIPPER)
+  async createWithAddresses(@Body() setAddressDto: SetAddressDto) {
+    return this.shipmentsService.setAddress(
+      setAddressDto.shipmentId,
+      setAddressDto,
+    );
+  }
+
+  // Update addresses
+  @Put(':id/addresses')
+  @UseGuards(ShipmentGuard)
+  @UseGuards(ShipmentSyncGuard)
+  @Roles(UserRole.SHIPPER)
+  async setAddresses(
+    @Param('id') id: string,
+    @Body() setAddressDto: SetAddressDto,
+  ): Promise<{ trackingToken: string }> {
+    return this.shipmentsService.setAddress(id, setAddressDto);
+  }
+
+  // Set time windows
+  @Put(':id/time-windows')
+  @UseGuards(ShipmentGuard)
+  @UseGuards(ShipmentSyncGuard)
+  @Roles(UserRole.SHIPPER)
+  async setTimeWindows(
+    @Param('id') id: string,
+    @Body() windows: ShipmentWindowsDto,
+  ): Promise<void> {
+    return this.shipmentsService.setTimeWindows(id, windows);
+  }
+
+  @Get(':id/addresses')
+  async getAddresses(@Param('id') id: string): Promise<GeocodeResponseDto> {
+    return this.shipmentsService.getAddresses(id);
+  }
+
+  @Get(':id/time-windows')
+  async getTimeWindows(@Param('id') id: string): Promise<ShipmentWindowsDto> {
+    return this.shipmentsService.getTimeWindows(id);
+  }
+
+  // // // Mark ready for pickup
+  // // @Put(':id/status/ready')
+  // // @Roles(UserRole.SHIPPER)
+  // // @UseGuards(ShipmentSyncGuard)
+  // // @UseGuards(ShipmentGuard)
+  // // async markReadyForPickup(@Param('id') id: string): Promise<void> {
+  // //   return this.shipmentsService.markReadyForPickup(id);
+  // // }
+
   @Post('geocode')
+  @UseGuards(ShipmentSyncGuard)
   async geocodeAddress(
     @Body() geocodeAddressDto: GeocodeAddressDto,
   ): Promise<GeocodeResponseDto> {
     return this.shipmentsService.geocodeAddress(geocodeAddressDto);
-  }
-
-  @Get('get-addresses/:id')
-  @Roles(UserRole.SHIPPER)
-  @UseGuards(ShipmentSyncGuard)
-  @UseGuards(ShipmentGuard)
-  async getAddresses(
-    @Param('id') id: number,
-  ): Promise<GeocodeResponseDto> {
-    return this.shipmentsService.getAddresses(id);
-  }
-
-  @Post(':id/ready-for-pickup')
-  @Roles(UserRole.SHIPPER)
-  @UseGuards(ShipmentSyncGuard)
-  @UseGuards(ShipmentGuard)
-  async markReadyForPickup(
-    @Param('id') id: number,
-    @User() user: IcpUser,
-  ): Promise<boolean> {
-    return this.shipmentsService.markReadyForPickup(id, user.principal);
   }
 
   @Get('my-pending')
@@ -77,7 +106,6 @@ export class ShipmentsController {
     return this.shipmentsService.findShipperPendingShipments(user.principal);
   }
 
-  // Tab 2: Bought shipments with proposed dates
   @Get('my-bought')
   @UseGuards(ShipmentSyncGuard)
   async getMyBoughtShipments(
@@ -86,36 +114,36 @@ export class ShipmentsController {
     return this.shipmentsService.findBoughtShipments(user.principal);
   }
 
-
   @Get('my-carried')
-  // @UseGuards(ShipmentSyncGuard)
-  // @Roles(UserRole.CARRIER, UserRole.ADMIN)
-  // @UseGuards(ShipmentGuard)
+  @UseGuards(ShipmentSyncGuard)
   async getMyCarriedShipments(
     @User() user: IcpUser,
   ): Promise<BoughtShipmentResponseDto[]> {
     return this.shipmentsService.findCarriedShipments(user.principal);
   }
 
-  // Set Pickup Date
-  @Post(':id/pickup-date')
-  @Roles(UserRole.CARRIER, UserRole.ADMIN)
-  @UseGuards(ShipmentGuard)
-  async setPickupDate(
-    @Param('id') id: number,
-    @Body() { pickupDate }: { pickupDate: Date },
-  ): Promise<boolean> {
-    return this.shipmentsService.setPickupDate(id, pickupDate);
-  }
+  // // // Set Pickup Date
+  // // @Put(':id/pickup-date')
+  // // @Roles(UserRole.CARRIER, UserRole.ADMIN)
+  // // @UseGuards(ShipmentGuard)
+  // // async setPickupDate(
+  // //   @Param('id') id: string,
+  // //   @Body() setPickupDateDto: SetStopDateDto,
+  // // ): Promise<boolean> {
+  // //   return this.shipmentsService.setPickupDate(id, setPickupDateDto.stopDate);
+  // // }
 
-  // Set Delivery Date
-  @Post(':id/delivery-date')
-  @Roles(UserRole.CARRIER, UserRole.ADMIN)
-  @UseGuards(ShipmentGuard)
-  async setDeliveryDate(
-    @Param('id') id: number,
-    @Body() { deliveryDate }: { deliveryDate: Date },
-  ): Promise<boolean> {
-    return this.shipmentsService.setDeliveryDate(id, deliveryDate);
-  }
+  // // // Set Delivery Date
+  // // @Put(':id/delivery-date')
+  // // @Roles(UserRole.CARRIER, UserRole.ADMIN)
+  // // @UseGuards(ShipmentGuard)
+  // // async setDeliveryDate(
+  // //   @Param('id') id: string,
+  // //   @Body() setDeliveryDateDto: SetStopDateDto,
+  // // ): Promise<boolean> {
+  // //   return this.shipmentsService.setDeliveryDate(
+  // //     id,
+  // //     setDeliveryDateDto.stopDate,
+  // //   );
+  // // }
 }

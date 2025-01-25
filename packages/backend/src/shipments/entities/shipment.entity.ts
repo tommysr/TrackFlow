@@ -2,25 +2,17 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, UpdateDateColumn, Cr
 import { Carrier } from 'src/carriers/entities/carrier.entity';
 import { Address } from './address.entity';
 import { Shipper } from 'src/auth/entities/shipper.entity';
+import { Transform } from 'class-transformer';
 // import { Route } from 'src/aggregation/entities/route.entity';
 
 export enum ShipmentStatus {
-  // Initial states
-  PENDING_NO_ADDRESS = 'PENDING_NO_ADDRESS',
-  PENDING_WITH_ADDRESS = 'PENDING_WITH_ADDRESS',
-  
-  // Purchase states
-  BOUGHT_NO_ADDRESS = 'BOUGHT_NO_ADDRESS',     // New state
-  BOUGHT_WITH_ADDRESS = 'BOUGHT_WITH_ADDRESS', // New state
-  
-  // Active states
-  READY_FOR_PICKUP = 'READY_FOR_PICKUP',
+  PENDING = 'PENDING',
+  BOUGHT = 'BOUGHT',
+  ROUTE_SET = 'ROUTE_SET',
   PICKED_UP = 'PICKED_UP',
   IN_TRANSIT = 'IN_TRANSIT',
-  
-  // Final states
   DELIVERED = 'DELIVERED',
-  CANCELLED = 'CANCELLED'
+  CANCELLED = 'CANCELLED',
 }
 
 @Entity()
@@ -29,7 +21,7 @@ export class Shipment {
   id: string;
 
   @Column('bigint', {unique: true})
-  canisterShipmentId: number;
+  canisterShipmentId: string;
 
   @ManyToOne(() => Shipper, (shipper) => shipper.shipments, { nullable: false })
   shipper: Shipper;
@@ -37,13 +29,15 @@ export class Shipment {
   @ManyToOne(() => Carrier, (carrier) => carrier.shipments, { nullable: true })
   carrier: Carrier;
 
-  @Column({ type: 'enum', enum: ShipmentStatus, default: ShipmentStatus.PENDING_NO_ADDRESS })
+  @Column({ type: 'enum', enum: ShipmentStatus, default: ShipmentStatus.PENDING })
   status: ShipmentStatus;
 
   @Column('decimal', { precision: 10, scale: 2 })
+  @Transform(({ value }) => Number(value))
   value: number;
 
   @Column('decimal', { precision: 10, scale: 2 })
+  @Transform(({ value }) => Number(value))
   price: number;
 
   @Column({ type: 'text' })
@@ -69,17 +63,19 @@ export class Shipment {
 
   @OneToOne(() => Address, address => address.pickupForShipment, { 
     cascade: true,
-    eager: true 
+    eager: true,
+    nullable: true
   })
   @JoinColumn()
-  pickupAddress: Address;
+  pickupAddress?: Address;
 
   @OneToOne(() => Address, address => address.deliveryForShipment, { 
     cascade: true,
-    eager: true 
+    eager: true,
+    nullable: true
   })
   @JoinColumn()
-  deliveryAddress: Address;
+  deliveryAddress?: Address;
 
   @Column('timestamp', { nullable: true })
   deliveryDate: Date;
@@ -93,9 +89,19 @@ export class Shipment {
   @Column('jsonb', { nullable: true })
   lastRouteSegment: { lat: number; lng: number }[];
 
-  @Column('timestamp', { nullable: true })
-  requiredDeliveryDate: Date;
 
   @Column({ nullable: true })
   trackingToken: string;
+
+  @Column('timestamp', { nullable: true })
+  pickupWindowStart?: Date;
+
+  @Column('timestamp', { nullable: true })
+  pickupWindowEnd?: Date;
+
+  @Column('timestamp', { nullable: true })
+  deliveryWindowStart?: Date;
+
+  @Column('timestamp', { nullable: true })
+  deliveryWindowEnd?: Date;
 } 

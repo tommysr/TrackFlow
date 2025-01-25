@@ -1,28 +1,12 @@
 import { ShipmentStatus } from '../entities/shipment.entity';
-
+import { AddressLocationResponseDto } from './address-location.dto';
+import { RouteSegmentDto } from './public-shipment-tracking.dto';
+import { LocationDto } from 'src/common/dto/location.dto';
 export class BaseShipmentResponseDto {
-  canisterShipmentId: number;
+  canisterShipmentId: string;
   status: ShipmentStatus;
   value: number;
   price: number;
-}
-
-export class AddressResponseDto {
-  street: string;
-  city: string;
-  zip: string;
-  country: string;
-}
-
-export class LocationResponseDto {
-  lat: number;
-  lng: number;
-}
-
-export class AddressLocationResponseDto {
-  address: AddressResponseDto | null;
-  location: LocationResponseDto | null;
-  isComplete: boolean;
 }
 
 export class CarrierResponseDto {
@@ -36,8 +20,8 @@ export class GeocodeResponseDto {
 }
 
 export class PendingShipmentResponseDto extends BaseShipmentResponseDto {
-  pickup: AddressLocationResponseDto;
-  delivery: AddressLocationResponseDto;
+  pickup?: AddressLocationResponseDto;
+  delivery?: AddressLocationResponseDto;
   trackingToken?: string;
 }
 
@@ -47,14 +31,9 @@ export class BoughtShipmentResponseDto extends PendingShipmentResponseDto {
   assignedCarrier: CarrierResponseDto;
 }
 
-export class InTransitShipmentResponseDto extends BaseShipmentResponseDto {
-  estimatedPickupDate?: Date;
-  estimatedDeliveryDate?: Date;
-  currentLocation?: {
-    lat: number;
-    lng: number;
-  };
+export class InTransitShipmentResponseDto extends BoughtShipmentResponseDto {
+  currentLocation?: LocationDto;
   lastUpdate?: Date;
   eta?: number;
-  routeSegment?: Array<{ lat: number; lng: number }>;
+  routeSegment?: RouteSegmentDto;
 }

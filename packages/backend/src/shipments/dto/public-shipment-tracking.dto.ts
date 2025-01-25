@@ -1,4 +1,9 @@
 import { ShipmentStatus } from "../entities/shipment.entity";
+import { LocationDto } from "src/common/dto/location.dto";
+
+export class RouteSegmentDto {
+  points: Array<LocationDto>;
+}
 
 export class PublicShipmentTrackingDto {
   status: ShipmentStatus;
@@ -6,13 +11,8 @@ export class PublicShipmentTrackingDto {
   estimatedDeliveryDate?: Date;
   
   // Only available when near delivery
-  currentLocation?: {
-    lat: number;
-    lng: number;
-  };
+  currentLocation?: LocationDto;
   lastUpdate?: Date;
   eta?: number;
-  routeSegment?: {
-    points: Array<{ lat: number; lng: number }>;
-  };
+  routeSegment?: RouteSegmentDto;
 }
