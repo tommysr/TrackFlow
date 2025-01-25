@@ -4,4 +4,4 @@ import { ShipmentStatus } from '../entities/shipment.entity';
 export class UpdateStatusDto {
   @IsEnum(ShipmentStatus)
   status: ShipmentStatus;
-} 
+}

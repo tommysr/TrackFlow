@@ -21,7 +21,7 @@ export class ShipmentGuard implements CanActivate {
     const user: IcpUser = request.user;
     const shipmentId = request.params.id || request.body.shipmentId;
 
-    this.logger.warn(`User ${user.principal} attempted unauthorized access to shipment ${shipmentId}`);
+    this.logger.log(`User ${user.principal} attempted access to shipment ${shipmentId}`);
 
     if (!shipmentId) {
       throw new ForbiddenException('No shipment ID provided');
@@ -38,6 +38,8 @@ export class ShipmentGuard implements CanActivate {
       context.getClass(),
     ]);
 
+    console.log('requiredRoles', requiredRoles);
+
     if (!requiredRoles) {
       return true;
     }
@@ -46,13 +48,13 @@ export class ShipmentGuard implements CanActivate {
       return true;
     }
 
-    this.logger.log(`Checking if user ${user.principal} is assigned to carrier ${shipment.shipper.principal}`);
-
     if (requiredRoles.includes(UserRole.SHIPPER) && shipment.shipper.principal === user.principal) {
+      this.logger.log(`User ${user.principal} is assigned to shipper ${shipment.shipper.principal}`);
       return true;
     }
 
     if (requiredRoles.includes(UserRole.CARRIER) && shipment.carrier?.principal === user.principal) {
+      this.logger.log(`User ${user.principal} is assigned to carrier ${shipment.carrier?.principal}`);
       return true;
     }
 

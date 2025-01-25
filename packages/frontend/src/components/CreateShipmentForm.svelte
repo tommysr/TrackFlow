@@ -5,25 +5,30 @@
   import Modal from './Modal.svelte';
   import { wallet } from '$src/lib/wallet.svelte';
   import { sha256 } from 'js-sha256';
-  import { getLocalStorage, setLocalStorage } from '$src/lib/storage';
-  import { invalidateAll } from '$app/navigation';
+  import { setLocalStorage } from '$src/lib/storage';
 
   interface ShipmentProps {
     showModal: boolean;
     onClose: () => void;
+    onShipmentCreated: (id: string) => void;
   }
 
-  let { showModal = $bindable(), onClose }: ShipmentProps = $props();
+  let {
+    showModal = $bindable(),
+    onClose,
+    onShipmentCreated,
+  }: ShipmentProps = $props();
 
   let source = $state({ lat: 0, lng: 0, street: '' });
   let destination = $state({ lat: 0, lng: 0, street: '' });
   let value = $state(0);
-  let size_category: 'Parcel' | 'Envelope' = $state('Parcel');
+  let size_category: 'Parcel' | 'Envelope' = $state('Envelope');
   let max_height = $state(0);
   let max_width = $state(0);
   let max_depth = $state(0);
   let price = $state(0);
   let name = $state('');
+  let showMarkers = $state(true);
 
   let isSelectMode = $state(false);
   let selectModeType: 'source' | 'destination' = $state('source');
@@ -32,7 +37,9 @@
 
   const generateRandomSecret = () => {
     const secret = crypto.getRandomValues(new Uint8Array(32));
-    const secretHex = Array.from(secret).map(byte => byte.toString(16).padStart(2, '0')).join('');
+    const secretHex = Array.from(secret)
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
     return secretHex;
   };
 
@@ -45,9 +52,7 @@
 
     try {
       const priceBigint = BigInt(price);
-
       const secret = generateRandomSecret();
-
       const hash = sha256.create();
       hash.update(secret);
       const hashed = hash.hex();
@@ -69,21 +74,18 @@
         value: BigInt(value),
       });
 
-
       if (Object.keys(res)[0] === 'Ok') {
         const id = (res as { Ok: bigint }).Ok;
         setLocalStorage(id.toString(), secret);
-        const loadedDone = getLocalStorage('done', secret);
-        console.log('loadedDone', loadedDone);
+        isSelectMode = false;
+        showMarkers = false;
+        onShipmentCreated(id.toString());
       } else {
         console.error('Failed to create shipment', res);
         return;
       }
 
       console.log('createShipment', res);
-
-      onClose();
-      await invalidateAll();
     } catch (e: any) {
       error = e.message || 'Failed to create shipment';
     }
@@ -238,19 +240,19 @@
       <button
         type="submit"
         class="bg-gradient-to-r from-blue-500 to-rose-400 rounded-full px-7 py-2 w-3/5 mx-auto text-white text-base transition ease-in-out hover:-translate-y-0.5 hover:scale-105 duration-200"
-        >Create Shipment</button
+        >Create & Continue</button
       >
     </form>
   </Modal>
 {/if}
 
-{#if source.street && (isSelectMode || showModal)}
+{#if source.street && (isSelectMode || showModal) && showMarkers}
   <Marker lngLat={[source.lng, source.lat]}>
     <div class="relative pin bounce-a cursor-pointer active"></div>
   </Marker>
 {/if}
 
-{#if destination.street && (isSelectMode || showModal)}
+{#if destination.street && (isSelectMode || showModal) && showMarkers}
   <Marker lngLat={[destination.lng, destination.lat]}>
     <div class="pin bounce-a cursor-pointer active"></div>
   </Marker>

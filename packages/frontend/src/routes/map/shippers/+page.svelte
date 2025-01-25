@@ -6,29 +6,23 @@
   import {
     isBoughtShipment,
     isPendingShipment,
+    isInTransitShipment,
     type BoughtShipment,
     type InTransitShipment,
     type PendingShipment,
   } from '$src/lib/extended.shipment';
   import Marker from '$components/Marker.svelte';
   import { wallet } from '$src/lib/wallet.svelte';
-  import type { Shipment } from '../../../../../declarations/canister/canister.did';
-  import AddressForm from '$components/AddressForm.svelte';
-  import Modal from '$components/Modal.svelte';
-  import { authenticatedFetch } from '$src/lib/canisters';
-  import { invalidateAll } from '$app/navigation';
-  import { Marker as M, MapEvents } from 'svelte-maplibre';
-    import { Ship } from 'lucide-svelte';
-
+  import { MapEvents } from 'svelte-maplibre';
 
   let { data }: { data: PageData } = $props();
 
   let isMobileOpen = $state(false);
   let isWalletConnected = $derived($wallet.connected);
   let selectedNav = $state(0);
-  let showAddressModal = $state(false);
-  let selectedShipment = $state<PendingShipment | null>(null);
-  let isLoading = $state(false);
+  let selectedShipment = $state<
+    PendingShipment | BoughtShipment | InTransitShipment | null
+  >(null);
   let error: string | null = $state(null);
   let previewMarkers = $state<{
     source: { lat: number; lng: number };
@@ -39,7 +33,6 @@
   function selectShipment(
     shipment: PendingShipment | BoughtShipment | InTransitShipment,
   ) {
-    console.log('selectShipment', shipment, 'previewMarkers', previewMarkers?.isPreviewMode);
     selectedShipment = shipment;
   }
 
@@ -65,37 +58,14 @@
     },
   ];
 
-  function openAddressModal(shipment: PendingShipment) {
-    selectedShipment = shipment;
-    showAddressModal = true;
-  }
-
-  function copyTrackingLink(shipment: PendingShipment) {
+  function copyTrackingLink(shipment: PendingShipment | BoughtShipment) {
     const trackingLink = `${window.location.origin}/map/track/${shipment.trackingToken || ''}`;
     navigator.clipboard.writeText(trackingLink);
   }
 
-  async function markReadyForPickup(shipment: BoughtShipment) {
-    isLoading = true;
-    error = null;
-
-    try {
-      const response = await authenticatedFetch(
-        `http://localhost:5000/shipments/${shipment.id}/ready-for-pickup`,
-        { method: 'POST' },
-      );
-
-      if (response.ok) {
-        await invalidateAll();
-      } else {
-        const errorData = await response.json();
-        error = errorData.message || 'Failed to mark as ready for pickup';
-      }
-    } catch (e: any) {
-      error = e.message || 'Failed to mark as ready for pickup';
-    } finally {
-      isLoading = false;
-    }
+  function formatDateTime(date: Date | undefined): string {
+    if (!date) return 'Not set';
+    return new Date(date).toLocaleString();
   }
 
   function handleMapClick(e: any) {
@@ -103,15 +73,12 @@
       selectedShipment = null;
     }
   }
-
-  $inspect(data);
 </script>
 
 <svelte:head>
   <title>Shippers</title>
-  <meta name="description" content="Svelte demo app" />
+  <meta name="description" content="Shipments management" />
 </svelte:head>
-
 
 <ListWrapper bind:isMobileOpen>
   {#if !isWalletConnected}
@@ -124,6 +91,7 @@
     </div>
   {:else}
     <div class="h-full flex w-full flex-col items-center">
+      <!-- Navigation Tabs -->
       <div class="inline-flex shadow-sm rounded-lg m-4 flex-none">
         {#each categories as { name }, i}
           <button
@@ -143,58 +111,92 @@
         {/each}
       </div>
 
+      <!-- Shipment List -->
       {#if categories[selectedNav].data.length > 0}
-        <div class="flex-1 flex w-full flex-col overflow-y-auto px-4 mt-5">
+        <div class="flex-1 flex w-full flex-col overflow-y-auto px-4 pt-5">
           <ul class="w-full flex-1 space-y-4">
             {#each categories[selectedNav].data as shipment}
               <li>
-                <ShipmentCard cardType="shipper" {shipment} onSelect={() => selectShipment(shipment)} selectable={true}>
-                  {#if isBoughtShipment(shipment)}
-                    <div class="flex mt-4 gap-5 justify-center">
-                      <button
-                        class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full disabled:opacity-50"
-                        onclick={() => copyTrackingLink(shipment)}
-                      >
-                        Copy Tracking Link
-                      </button>
-                      {#if shipment.status == 'BOUGHT_WITH_ADDRESS'}
+                <ShipmentCard
+                  cardType="shipper"
+                  {shipment}
+                  onSelect={() => selectShipment(shipment)}
+                  selectable={true}
+                >
+                  <!-- Additional Info Based on Shipment Type -->
+                  <div class="mt-4 space-y-2 text-sm">
+                    {#if isInTransitShipment(shipment)}
+                      <!-- In Transit Shipment Info -->
+                      <div class="flex flex-col gap-2">
+                        <p>Carrier: {shipment.assignedCarrier.name}</p>
+                        <p>Status: {shipment.status}</p>
+                        {#if shipment.estimatedDeliveryDate}
+                          <p>
+                            Estimated Delivery: {formatDateTime(
+                              shipment.estimatedDeliveryDate,
+                            )}
+                          </p>
+                        {/if}
+                        {#if shipment.lastUpdate}
+                          <p>
+                            Last Updated: {formatDateTime(shipment.lastUpdate)}
+                          </p>
+                        {/if}
                         <button
-                          class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full disabled:opacity-50"
-                          onclick={() =>
-                            markReadyForPickup(shipment as BoughtShipment)}
-                          disabled={isLoading}
-                        >
-                          {isLoading ? 'Marking...' : 'Mark Ready for Pickup'}
-                        </button>
-                      {/if}
-                    </div>
-
-                    {#if error}
-                      <div
-                        class="mt-2 p-2 bg-red-50 rounded text-red-700 text-sm"
-                      >
-                        {error}
-                      </div>
-                    {/if}
-                  {:else if isPendingShipment(shipment)}
-                    <div class="flex mt-4 gap-5 justify-center">
-                      {#if shipment.trackingToken}
-                        <button
-                          class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full disabled:opacity-50"
+                          class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full"
                           onclick={() => copyTrackingLink(shipment)}
                         >
                           Copy Tracking Link
                         </button>
-                      {:else}
+                      </div>
+                    {:else if isBoughtShipment(shipment)}
+                      <!-- Bought Shipment Info -->
+                      <div class="flex flex-col gap-2">
+                        <p>Carrier: {shipment.assignedCarrier.name}</p>
+                        {#if shipment.pickupTimeWindow}
+                          <p>
+                            Pickup Window: {formatDateTime(
+                              shipment.pickupTimeWindow.start,
+                            )} - {formatDateTime(shipment.pickupTimeWindow.end)}
+                          </p>
+                        {/if}
+                        {#if shipment.deliveryTimeWindow}
+                          <p>
+                            Delivery Window: {formatDateTime(
+                              shipment.deliveryTimeWindow.start,
+                            )} - {formatDateTime(
+                              shipment.deliveryTimeWindow.end,
+                            )}
+                          </p>
+                        {/if}
+                        {#if shipment.estimatedPickupDate}
+                          <p>
+                            Estimated Pickup: {formatDateTime(
+                              shipment.estimatedPickupDate,
+                            )}
+                          </p>
+                        {/if}
                         <button
-                          class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full disabled:opacity-50"
-                          onclick={() => openAddressModal(shipment)}
+                          class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full"
+                          onclick={() => copyTrackingLink(shipment)}
                         >
-                          Set Address
+                          Copy Tracking Link
                         </button>
-                      {/if}
-                    </div>
-                  {/if}
+                      </div>
+                    {:else if isPendingShipment(shipment)}
+                      <!-- Pending Shipment Info -->
+                      <div class="flex flex-col gap-4">
+                        {#if shipment.trackingToken}
+                          <button
+                            class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full"
+                            onclick={() => copyTrackingLink(shipment)}
+                          >
+                            Copy Tracking Link
+                          </button>
+                        {/if}
+                      </div>
+                    {/if}
+                  </div>
                 </ShipmentCard>
               </li>
             {/each}
@@ -213,104 +215,41 @@
   {/if}
 </ListWrapper>
 
-<AddressForm
-  shipment={selectedShipment}
-  bind:showModal={showAddressModal}
-  onClose={() => (showAddressModal = false)}
-  onCoordinates={(e) => (previewMarkers = e)}
-/>
-
-{#if !selectedShipment && !previewMarkers?.isPreviewMode}
+<!-- Map Markers -->
+{#if !selectedShipment}
   {#each categories[selectedNav].data as shipment}
     <Marker
       onClick={() => selectShipment(shipment)}
-      location={shipment.pickup.location ? shipment.pickup.location : shipment.info.source}
-      name={'P'}
+      location={shipment.pickup
+        ? { lat: shipment.pickup.lat, lng: shipment.pickup.lng }
+        : { lat: shipment.info.source.lat, lng: shipment.info.source.lng }}
+      name={shipment.pickup ? 'P' : 'Es P'}
     />
   {/each}
-{:else if selectedShipment && !previewMarkers?.isPreviewMode}
+{:else}
   <Marker
-    onClick={() => selectedShipment = null}
-    location={selectedShipment.pickup.location ? selectedShipment.pickup.location : selectedShipment.info.source}
-    name={'P'}
+    onClick={() => (selectedShipment = null)}
+    location={selectedShipment.pickup
+      ? { lat: selectedShipment.pickup.lat, lng: selectedShipment.pickup.lng }
+      : {
+          lat: selectedShipment.info.source.lat,
+          lng: selectedShipment.info.source.lng,
+        }}
+    name={selectedShipment.pickup ? 'P' : 'Es P'}
   />
   <Marker
-    onClick={() => selectedShipment = null}
-    location={selectedShipment.delivery.location ? selectedShipment.delivery.location : selectedShipment.info.destination}
-    name={'D'}
+    onClick={() => (selectedShipment = null)}
+    location={selectedShipment.delivery
+      ? {
+          lat: selectedShipment.delivery.lat,
+          lng: selectedShipment.delivery.lng,
+        }
+      : {
+          lat: selectedShipment.info.destination.lat,
+          lng: selectedShipment.info.destination.lng,
+        }}
+    name={selectedShipment.delivery ? 'D' : 'Es D'}
   />
-{:else if previewMarkers}
-  <M
-    lngLat={[previewMarkers.source.lng, previewMarkers.source.lat]}
-    draggable={true}
-    on:dragend={(e) => {
-      const [lng, lat] = e.detail.lngLat;
-      previewMarkers = {
-        ...previewMarkers!,
-        destination: previewMarkers!.destination,
-        isPreviewMode: previewMarkers!.isPreviewMode,
-        source: { lat, lng },
-      };
-    }}
-  >
-    <div class="pin bounce-a active">P</div>
-  </M>
-
-  <M
-    lngLat={[previewMarkers.destination.lng, previewMarkers.destination.lat]}
-    draggable={true}
-    on:dragend={(e) => {
-      const [lng, lat] = e.detail.lngLat;
-      previewMarkers = {
-        ...previewMarkers!,
-        source: previewMarkers!.source,
-        isPreviewMode: previewMarkers!.isPreviewMode,
-        destination: { lat, lng },
-      };
-    }}
-  >
-    <div class="pin bounce-a active">D</div>
-  </M>
 {/if}
 
 <MapEvents on:click={handleMapClick} />
-
-<style>
-  .pin {
-    width: 30px;
-    height: 30px;
-    border-radius: 50% 50% 50% 0;
-    background: #00cae9;
-    position: absolute;
-    transform: rotate(-45deg);
-    left: 50%;
-    top: 50%;
-    margin: -15px 0 0 -15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: bold;
-  }
-
-  .pin.active {
-    background: linear-gradient(45deg, #00cae9, #e95f8a);
-  }
-
-  .pin :global(span) {
-    transform: rotate(45deg);
-  }
-
-  .bounce-a {
-    animation: bounce 0.5s ease-in-out infinite alternate;
-  }
-
-  @keyframes bounce {
-    from {
-      transform: rotate(-45deg) translateY(0);
-    }
-    to {
-      transform: rotate(-45deg) translateY(-5px);
-    }
-  }
-</style>

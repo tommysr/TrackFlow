@@ -9,9 +9,8 @@
   import Modal from './Modal.svelte';
   import { onMount } from 'svelte';
 
-
   interface AddressFormProps {
-    shipment: PendingShipment | null;
+    shipmentId: string;
     showModal: boolean;
     onClose: () => void;
     onCoordinates: (e: {
@@ -19,20 +18,21 @@
       destination: { lat: number; lng: number };
       isPreviewMode: boolean;
     }) => void;
+    onAddressesSet: () => void;
   }
 
   let {
-    shipment,
+    shipmentId,
     showModal = $bindable(),
     onClose,
     onCoordinates,
+    onAddressesSet,
   }: AddressFormProps = $props();
-
 
   async function fetchAddresses() {
     try {
       const response = await authenticatedFetch(
-        `http://localhost:5000/shipments/get-addresses/${shipment?.id}`,
+        `http://localhost:5000/shipments/${shipmentId}/addresses`,
         {
           method: 'GET',
         },
@@ -52,8 +52,8 @@
           street: data.pickup.address.street,
           city: data.pickup.address.city,
           zip: data.pickup.address.zip,
-          lat: data.pickup.location.lat,
-          lng: data.pickup.location.lng,
+          lat: data.pickup.lat,
+          lng: data.pickup.lng,
         };
 
         destination = {
@@ -61,8 +61,8 @@
           street: data.delivery.address.street,
           city: data.delivery.address.city,
           zip: data.delivery.address.zip,
-          lat: data.delivery.location.lat,
-          lng: data.delivery.location.lng,
+          lat: data.delivery.lat,
+          lng: data.delivery.lng,
         };
 
         console.log(source, destination);
@@ -79,7 +79,7 @@
 
   // Watch for changes in showModal and shipment
   $effect(() => {
-    if (showModal && shipment) {
+    if (showModal) {
       fetchAddresses();
     }
   });
@@ -89,8 +89,8 @@
     city: '',
     zip: '',
     country: '',
-    lat: shipment?.info.source.lat || 52.237049,
-    lng: shipment?.info.source.lng || 21.017532,
+    lat: 52.237049,
+    lng: 21.017532,
   });
 
   let destination = $state({
@@ -98,8 +98,8 @@
     city: '',
     zip: '',
     country: '',
-    lat: shipment?.info.destination.lat || 52.237049,
-    lng: shipment?.info.destination.lng || 21.017532,
+    lat: 52.237049,
+    lng: 21.017532,
   });
 
   let error: string | null = $state(null);
@@ -142,14 +142,14 @@
         const data = await response.json();
         source = {
           ...source,
-          lat: data.pickup.location.lat,
-          lng: data.pickup.location.lng,
+          lat: data.pickup.lat,
+          lng: data.pickup.lng,
         };
 
         destination = {
           ...destination,
-          lat: data.delivery.location.lat,
-          lng: data.delivery.location.lng,
+          lat: data.delivery.lat,
+          lng: data.delivery.lng,
         };
 
         geocodedCalled = true;
@@ -174,7 +174,7 @@
 
     try {
       const response = await authenticatedFetch(
-        'http://localhost:5000/shipments/set-addresses',
+        `http://localhost:5000/shipments/create`,
         {
           method: 'POST',
           headers: {
@@ -182,7 +182,7 @@
           },
           body: JSON.stringify(
             {
-              shipmentId: shipment?.id,
+              shipmentId,
               pickupAddress: {
                 street: source.street,
                 city: source.city,
@@ -201,7 +201,7 @@
               },
             },
             (_, v) => {
-              return typeof v == 'bigint' ? Number(v) : v;
+              return typeof v == 'bigint' ? v.toString() : v;
             },
           ),
         },
@@ -213,8 +213,8 @@
           secret: data.trackingToken,
           trackingLink: `http://localhost:5173/track/${data.trackingToken}`,
         };
-        await invalidateAll();
-        onClose();
+
+        onAddressesSet();
       } else {
         const errorData = await response.json();
         error = errorData.message || 'Failed to save addresses';
@@ -237,12 +237,17 @@
     onCoordinates({
       source: { lat: source.lat, lng: source.lng },
       destination: { lat: destination.lat, lng: destination.lng },
-      isPreviewMode
+      isPreviewMode,
     });
   });
 </script>
 
-<Modal bind:showModal onClose={() => (showModal = false)}>
+<Modal
+  bind:showModal
+  onClose={() => {
+    showModal = false;
+  }}
+>
   <div class="address-form p-6">
     <h1
       class="text-3xl text-center font-semibold inline-block bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-8"

@@ -181,6 +181,7 @@ body {
   width: 30px;
   height: 30px;
   border-radius: 50% 50% 50% 0;
+  rotate: -45deg;
   background: var(--text-400);
   position: absolute;
   left: -15px;  // Half of width
@@ -219,6 +220,14 @@ body {
     }
   }
 
+  &.start {
+    background: var(--primary-500);
+  }
+
+  &.end {
+    background: var(--secondary-500);
+  }
+
   &.delivery {
     animation: pulse 1s ease-in-out infinite;
     background: var(--secondary-400);
@@ -229,20 +238,16 @@ body {
   }
 }
 
-.pin :global(span) {
-  transform: rotate(45deg);
-}
-
 .bounce-a {
   animation: bounce 0.5s ease-in-out infinite alternate;
 }
 
 @keyframes bounce {
   from {
-    transform: rotate(-45deg) translateY(0);
+    transform: translateY(0);
   }
   to {
-    transform: rotate(-45deg) translateY(-5px);
+    transform: translateY(-5px);
   }
 }
 
@@ -265,31 +270,31 @@ body {
 @keyframes bounce-a {
   0% {
     opacity: 0;
-    transform: translateY(-2000px) rotate(-45deg);
+    transform: translateY(-2000px);
   }
 
   60% {
     opacity: 1;
-    transform: translateY(30px) rotate(-45deg);
+    transform: translateY(30px);
   }
 
   80% {
-    transform: translateY(-10px) rotate(-45deg);
+    transform: translateY(-10px);
   }
 
   100% {
-    transform: translateY(0) rotate(-45deg);
+    transform: translateY(0);
   }
 }
 
-@keyframes pulse {
-  0% {
-    transform: rotate(-45deg) scale(1);
-  }
-  50% {
-    transform: rotate(-45deg) scale(1.2);
-  }
-  100% {
-    transform: rotate(-45deg) scale(1);
-  }
-}
+// @keyframes pulse {
+//   0% {
+//     transform: rotate(0deg) scale(1);
+//   }
+//   50% {
+//     transform: rotate(0deg) scale(1.2);
+//   }
+//   100% {
+//     transform: rotate(0deg) scale(1);
+//   }
+// }

@@ -5,10 +5,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { Shipment, ShipmentStatus } from './entities/shipment.entity';
 import {
-  AddressLocationResponseDto,
   BaseShipmentResponseDto,
   BoughtShipmentResponseDto,
   GeocodeResponseDto,
@@ -20,7 +19,10 @@ import { geocodeAddress } from '../utils/geocode.util';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
 import { Address } from './entities/address.entity';
-
+import { RouteStop } from '../routes/entities/routeStop.entity';
+import { RouteStatus } from '../routes/entities/route.entity';
+import { AddressLocationResponseDto } from './dto/address-location.dto';
+import { ShipmentWindowsDto } from './dto/time-window.dto';
 @Injectable()
 export class ShipmentsService {
   private readonly logger = new Logger(ShipmentsService.name);
@@ -32,24 +34,20 @@ export class ShipmentsService {
     private readonly configService: ConfigService,
     @InjectRepository(Address)
     private readonly addressRepository: Repository<Address>,
+    @InjectRepository(RouteStop)
+    private readonly routeStopRepo: Repository<RouteStop>,
   ) {
     this.geocodingApiKey = this.configService.get('routing.apiKey');
   }
 
-  async findOneById(id: number): Promise<Shipment> {
-    await this.syncService.pullEvents();
-
+  async findOneById(canisterShipmentId: string): Promise<Shipment> {
+    this.logger.log(`Finding shipment with ID: ${canisterShipmentId}`);
     const shipment = await this.shipmentRepository.findOne({
-      where: { canisterShipmentId: id },
-      relations: [
-        'shipper',
-        'carrier',
-        'pickupAddress',
-        'deliveryAddress',
-      ],
+      where: { canisterShipmentId },
+      relations: ['shipper', 'carrier', 'pickupAddress', 'deliveryAddress'],
     });
 
-    // console.log(`Shipment found: ${JSON.stringify(shipment)}`);
+    console.log(`Shipment found: ${shipment?.canisterShipmentId}`);
 
     if (!shipment) {
       throw new NotFoundException('Shipment not found');
@@ -64,13 +62,28 @@ export class ShipmentsService {
     });
   }
 
-  async getAddresses(shipmentId: number): Promise<GeocodeResponseDto> {
-    const shipment = await this.findOneById(shipmentId);
+  async getTimeWindows(canisterShipmentId: string): Promise<ShipmentWindowsDto> {
+    const shipment = await this.findOneById(canisterShipmentId);
+    return {
+      pickup: shipment.pickupWindowStart && shipment.pickupWindowEnd ? {
+        start: shipment.pickupWindowStart,
+        end: shipment.pickupWindowEnd,
+        }
+      : undefined,
+      delivery: shipment.deliveryWindowStart && shipment.deliveryWindowEnd
+        ? {
+            start: shipment.deliveryWindowStart,
+            end: shipment.deliveryWindowEnd,
+          }
+        : undefined,
+    };
+  }
 
-    if (
-      !shipment.pickupAddress.isComplete() ||
-      !shipment.deliveryAddress.isComplete()
-    ) {
+
+  async getAddresses(canisterShipmentId: string): Promise<GeocodeResponseDto> {
+    const shipment = await this.findOneById(canisterShipmentId);
+
+    if (!shipment.pickupAddress || !shipment.deliveryAddress) {
       throw new NotFoundException(
         'Shipment does not have pickup or delivery addresses',
       );
@@ -92,88 +105,67 @@ export class ShipmentsService {
 
     return {
       pickup: {
-        location: {
-          lat: geocodedPickupAddress.latitude,
-          lng: geocodedPickupAddress.longitude,
-        },
+        lat: geocodedPickupAddress.latitude,
+        lng: geocodedPickupAddress.longitude,
         address: {
           street: geocodeAddressDto.pickupAddress.street,
           city: geocodeAddressDto.pickupAddress.city,
           zip: geocodeAddressDto.pickupAddress.zip,
           country: geocodeAddressDto.pickupAddress.country,
         },
-        isComplete: false,
       },
       delivery: {
-        location: {
-          lat: geocodedDeliveryAddress.latitude,
-          lng: geocodedDeliveryAddress.longitude,
-        },
+        lat: geocodedDeliveryAddress.latitude,
+        lng: geocodedDeliveryAddress.longitude,
         address: {
           street: geocodeAddressDto.deliveryAddress.street,
           city: geocodeAddressDto.deliveryAddress.city,
           zip: geocodeAddressDto.deliveryAddress.zip,
           country: geocodeAddressDto.deliveryAddress.country,
         },
-        isComplete: false,
       },
     };
   }
 
   // Modified createShipment to handle sync properly
   async setAddress(
+    id: string,
     setAddressDto: SetAddressDto,
   ): Promise<{ trackingToken: string }> {
-    const shipment = await this.findOneById(setAddressDto.shipmentId);
+    const shipment = await this.findOneById(id);
 
     if (!shipment) {
       throw new NotFoundException('Shipment not found on ICP');
     }
 
-    if (shipment.status == ShipmentStatus.BOUGHT_WITH_ADDRESS) {
+    if (shipment.status == ShipmentStatus.ROUTE_SET) {
       throw new BadRequestException('Shipment addresses cant be changed');
     }
 
     // Create pickup address
     const pickupAddress = this.addressRepository.create({
       ...setAddressDto.pickupAddress,
-      latitude: setAddressDto.pickupAddress.lat,
-      longitude: setAddressDto.pickupAddress.lng,
-      icpLat: shipment.pickupAddress.icpLat,
-      icpLng: shipment.pickupAddress.icpLng,
     });
 
     // Create delivery address
     const deliveryAddress = this.addressRepository.create({
       ...setAddressDto.deliveryAddress,
-      latitude: setAddressDto.deliveryAddress.lat,
-      longitude: setAddressDto.deliveryAddress.lng,
-      icpLat: shipment.deliveryAddress.icpLat,
-      icpLng: shipment.deliveryAddress.icpLng,
     });
-
-    // Save addresses first
-    await Promise.all([
-      this.addressRepository.save(pickupAddress),
-      this.addressRepository.save(deliveryAddress),
-    ]);
-
-    shipment.pickupAddress = pickupAddress;
-    shipment.deliveryAddress = deliveryAddress;
 
     // Generate tracking token (24 hour validity)
     const trackingToken = this.generateTrackingToken(
       shipment.canisterShipmentId,
     );
 
+    shipment.pickupAddress = pickupAddress;
+    shipment.deliveryAddress = deliveryAddress;
     shipment.trackingToken = trackingToken;
 
-    if (shipment.status === ShipmentStatus.PENDING_NO_ADDRESS) {
-      shipment.status = ShipmentStatus.PENDING_WITH_ADDRESS;
-    } else if (shipment.status === ShipmentStatus.BOUGHT_NO_ADDRESS) {
-      shipment.status = ShipmentStatus.BOUGHT_WITH_ADDRESS;
-    }
-
+    // Save addresses first
+    await Promise.all([
+      this.addressRepository.save(pickupAddress),
+      this.addressRepository.save(deliveryAddress),
+    ]);
     await this.shipmentRepository.save(shipment);
 
     return {
@@ -181,7 +173,7 @@ export class ShipmentsService {
     };
   }
 
-  private generateTrackingToken(shipmentId: number): string {
+  private generateTrackingToken(shipmentId: string): string {
     const payload = {
       shipmentId,
       exp: Date.now() + 48 * 60 * 60 * 1000, // 48 hours from now
@@ -206,16 +198,15 @@ export class ShipmentsService {
 
   private toAddressResponse(address: Address): AddressLocationResponseDto {
     return {
-      address: address.isComplete()
-        ? {
-            street: address.street,
-            city: address.city,
-            zip: address.zip,
-            country: address.country,
-          }
-        : null,
-      location: address.getPreciseLocation(),
-      isComplete: address.isComplete(),
+      address: {
+        street: address.street,
+        city: address.city,
+        zip: address.zip,
+        country: address.country,
+      },
+
+      lat: address.lat,
+      lng: address.lng,
     };
   }
 
@@ -224,8 +215,12 @@ export class ShipmentsService {
   ): PendingShipmentResponseDto {
     return {
       ...this.toBaseShipmentResponseDto(shipment),
-      pickup: this.toAddressResponse(shipment.pickupAddress),
-      delivery: this.toAddressResponse(shipment.deliveryAddress),
+      pickup: shipment.pickupAddress
+        ? this.toAddressResponse(shipment.pickupAddress)
+        : null,
+      delivery: shipment.deliveryAddress
+        ? this.toAddressResponse(shipment.deliveryAddress)
+        : null,
       trackingToken: shipment.trackingToken,
     };
   }
@@ -237,21 +232,10 @@ export class ShipmentsService {
     const shipments = await this.shipmentRepository.find({
       where: {
         shipper: { principal },
-        status: In([
-          ShipmentStatus.PENDING_WITH_ADDRESS,
-          ShipmentStatus.PENDING_NO_ADDRESS,
-          ShipmentStatus.BOUGHT_NO_ADDRESS,
-        ]),
+        status: ShipmentStatus.PENDING,
       },
-      relations: [
-        'shipper',
-        'pickupAddress',
-        'deliveryAddress',
-        'carrier',
-      ],
+      relations: ['shipper', 'pickupAddress', 'deliveryAddress'],
     });
-
-    // this.logger.log(shipments);
 
     return shipments.map((shipment) =>
       this.toPendingShipmentResponseDto(shipment),
@@ -265,10 +249,7 @@ export class ShipmentsService {
     const shipments = await this.shipmentRepository.find({
       where: {
         shipper: { principal },
-        status: In([
-          ShipmentStatus.BOUGHT_WITH_ADDRESS,
-          ShipmentStatus.READY_FOR_PICKUP,
-        ]),
+        status: ShipmentStatus.BOUGHT,
       },
       relations: [
         'shipper',
@@ -278,8 +259,6 @@ export class ShipmentsService {
         'deliveryAddress',
       ],
     });
-
-    // this.logger.log(shipments);
 
     return shipments.map((shipment) => ({
       ...this.toPendingShipmentResponseDto(shipment),
@@ -291,100 +270,161 @@ export class ShipmentsService {
         : null,
       estimatedPickupDate: shipment.estimatedPickupTime,
       estimatedDeliveryDate: shipment.estimatedDeliveryTime,
+      pickupTimeWindow: shipment.pickupWindowStart && shipment.pickupWindowEnd
+        ? {
+            start: shipment.pickupWindowStart,
+            end: shipment.pickupWindowEnd,
+          }
+        : undefined,
+      deliveryTimeWindow: shipment.deliveryWindowStart && shipment.deliveryWindowEnd
+        ? {
+            start: shipment.deliveryWindowStart,
+            end: shipment.deliveryWindowEnd,
+          }
+        : undefined,
     }));
   }
 
-  async markReadyForPickup(id: number, principal: string): Promise<boolean> {
-    const shipment = await this.shipmentRepository.findOne({
-      where: {
-        canisterShipmentId: id,
-        shipper: { principal },
-      },
-      relations: [
-        'shipper',
-        'carrier',
-        'route',
-        'pickupAddress',
-        'deliveryAddress',
-      ],
-    });
+  async setTimeWindows(
+    canisterShipmentId: string,
+    windows: ShipmentWindowsDto,
+  ): Promise<void> {
+    const shipment = await this.findOneById(canisterShipmentId);
 
     if (!shipment) {
       throw new NotFoundException('Shipment not found');
     }
 
-    if (!shipment.pickupAddress || !shipment.deliveryAddress) {
+    if (shipment.status !== ShipmentStatus.BOUGHT && shipment.status !== ShipmentStatus.PENDING) {
       throw new BadRequestException(
-        'Shipment must have pickup and delivery addresses',
+        'Time windows can only be set for shipments in BOUGHT or PENDING status',
       );
     }
-
-    if (shipment.status !== ShipmentStatus.BOUGHT_WITH_ADDRESS) {
-      throw new BadRequestException(
-        'Shipment must be in BOUGHT_WITH_ADDRESS status',
-      );
-    }
-
-    shipment.status = ShipmentStatus.READY_FOR_PICKUP;
-    await this.shipmentRepository.save(shipment);
-
-    return true;
-  }
-
-  // Set Pickup Date, only carrier or admin
-  async setPickupDate(id: number, pickupDate: Date): Promise<boolean> {
-    const shipment = await this.findOneById(id);
 
     if (
-      !shipment.pickupAddress ||
-      !shipment.pickupAddress.latitude ||
-      !shipment.pickupAddress.longitude
+      windows.pickup.start > windows.pickup.end ||
+      windows.delivery.start > windows.delivery.end ||
+      windows.pickup.start > windows.delivery.start ||
+      windows.pickup.start < new Date() ||
+      windows.delivery.start < new Date()
     ) {
-      throw new BadRequestException(
-        'Cannot set pickup date without a complete pickup address',
-      );
+      throw new BadRequestException('Invalid time windows');
     }
 
-    if (shipment.status !== ShipmentStatus.READY_FOR_PICKUP) {
-      throw new BadRequestException(
-        'Cannot set pickup date for this shipment status',
-      );
-    }
+    shipment.pickupWindowStart = windows.pickup.start;
+    shipment.pickupWindowEnd = windows.pickup.end;
+    shipment.deliveryWindowStart = windows.delivery.start;
+    shipment.deliveryWindowEnd = windows.delivery.end;
 
-    shipment.pickupDate = pickupDate;
     await this.shipmentRepository.save(shipment);
-    return true;
   }
 
-  // Set Delivery Date
-  async setDeliveryDate(id: number, deliveryDate: Date): Promise<boolean> {
-    const shipment = await this.findOneById(id);
+  // async markReadyForPickup(canisterShipmentId: string): Promise<void> {
+  //   const shipment = await this.shipmentRepository.findOne({
+  //     where: {
+  //       canisterShipmentId,
+  //     },
+  //     relations: [
+  //       'shipper',
+  //       'carrier',
+  //       'route',
+  //       'pickupAddress',
+  //       'deliveryAddress',
+  //     ],
+  //   });
 
-    if (
-      !shipment.deliveryAddress ||
-      !shipment.deliveryAddress.latitude ||
-      !shipment.deliveryAddress.longitude
-    ) {
-      throw new BadRequestException(
-        'Cannot set delivery date without a complete delivery address',
-      );
-    }
+  //   if (!shipment) {
+  //     throw new NotFoundException('Shipment not found');
+  //   }
 
-    if (shipment.status !== ShipmentStatus.IN_TRANSIT) {
-      throw new BadRequestException(
-        'Cannot set delivery date for this shipment status',
-      );
-    }
-    shipment.deliveryDate = deliveryDate;
-    await this.shipmentRepository.save(shipment);
-    return true;
-  }
+  //   if (shipment.status !== ShipmentStatus.BOUGHT_WITH_ADDRESS) {
+  //     throw new BadRequestException(
+  //       'Shipment must be in BOUGHT_WITH_ADDRESS status',
+  //     );
+  //   }
+
+  //   shipment.status = ShipmentStatus.READY_FOR_PICKUP;
+
+  //   await this.shipmentRepository.save(shipment);
+  // }
+
+  // // Set Pickup Date, only carrier or admin
+  // async setPickupDate(
+  //   canisterShipmentId: string,
+  //   pickupDate: Date,
+  // ): Promise<boolean> {
+  //   const shipment = await this.findOneById(canisterShipmentId);
+
+  //   if (!shipment.pickupAddress) {
+  //     throw new BadRequestException(
+  //       'Cannot set pickup date without a complete pickup address',
+  //     );
+  //   }
+
+  //   if (shipment.status !== ShipmentStatus.READY_FOR_PICKUP) {
+  //     throw new BadRequestException(
+  //       'Cannot set pickup date for this shipment status',
+  //     );
+  //   }
+
+  //   shipment.pickupDate = pickupDate;
+  //   await this.shipmentRepository.save(shipment);
+  //   return true;
+  // }
+
+  // // Set Delivery Date
+  // async setDeliveryDate(
+  //   canisterShipmentId: string,
+  //   deliveryDate: Date,
+  // ): Promise<boolean> {
+  //   const shipment = await this.findOneById(canisterShipmentId);
+
+  //   if (!shipment.deliveryAddress) {
+  //     throw new BadRequestException(
+  //       'Cannot set delivery date without a complete delivery address',
+  //     );
+  //   }
+
+  //   if (shipment.status !== ShipmentStatus.IN_TRANSIT) {
+  //     throw new BadRequestException(
+  //       'Cannot set delivery date for this shipment status',
+  //     );
+  //   }
+  //   shipment.deliveryDate = deliveryDate;
+  //   await this.shipmentRepository.save(shipment);
+  //   return true;
+  // }
 
   async findCarriedShipments(
-    principal: string,
+    carrierId: string,
   ): Promise<BoughtShipmentResponseDto[]> {
+    // Get all shipments assigned to routes
+    const routeStops = await this.routeStopRepo.find({
+      where: {
+        route: {
+          carrier: { principal: carrierId },
+          status: Not(In([RouteStatus.COMPLETED, RouteStatus.CANCELLED])),
+        },
+      },
+      relations: ['shipment'],
+    });
+
+    console.log(routeStops);
+
+    // Transform bigint shipmentIds to numbers
+    const assignedShipmentIds = routeStops
+      .map((stop) => stop.shipment?.canisterShipmentId)
+      .filter((id) => id !== undefined);
+
+    console.log('Assigned shipment IDs:', assignedShipmentIds);
+
+    // Get available shipments (not in routes)
     const shipments = await this.shipmentRepository.find({
-      where: { carrier: { principal } },
+      where: {
+        carrier: { principal: carrierId },
+        status: In([ShipmentStatus.BOUGHT]),
+        canisterShipmentId: Not(In(assignedShipmentIds)), // Exclude shipments that are in routes
+      },
       relations: [
         'shipper',
         'carrier',
@@ -404,6 +444,18 @@ export class ShipmentsService {
         : null,
       estimatedPickupDate: shipment.estimatedPickupTime,
       estimatedDeliveryDate: shipment.estimatedDeliveryTime,
+      pickupTimeWindow: shipment.pickupWindowStart && shipment.pickupWindowEnd
+        ? {
+            start: shipment.pickupWindowStart,
+            end: shipment.pickupWindowEnd,
+          }
+        : undefined,
+      deliveryTimeWindow: shipment.deliveryWindowStart && shipment.deliveryWindowEnd
+        ? {
+            start: shipment.deliveryWindowStart,
+            end: shipment.deliveryWindowEnd,
+          }
+        : undefined,
     }));
   }
 }

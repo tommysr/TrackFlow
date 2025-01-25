@@ -1,48 +1,10 @@
 import {
   IsString,
   IsNotEmpty,
-  ValidateNested,
-  IsNumber,
-  Matches,
-  IsISBN,
-  IsPostalCode,
-  isAlphanumeric,
+  ValidateNested
 } from 'class-validator';
 import { Type } from 'class-transformer';
-
-export class AddressDto {
-  @IsString()
-  @IsNotEmpty()
-  @Matches(/^[a-zA-Z0-9\s,.-]+$/)
-  street: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @Matches(/^[a-zA-Z\s.-]+$/)
-  city: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @IsPostalCode('PL')
-  zip: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @Matches(/^PL$/)
-  country: string;
-}
-
-export class LocationDto {
-  @IsNumber()
-  @IsNotEmpty()
-  lat: number;
-
-  @IsNumber()
-  @IsNotEmpty()
-  lng: number;
-}
-
-export class AddressLocationDto extends LocationDto {}
+import { AddressDto, AddressLocationDto } from './address-location.dto';
 
 export class SetAddressDto {
   @ValidateNested()
@@ -53,10 +15,9 @@ export class SetAddressDto {
   @Type(() => AddressLocationDto)
   deliveryAddress: AddressLocationDto;
 
-  // TODO: take bigint from blockchain
-  @IsNumber()
+  @IsString()
   @IsNotEmpty()
-  shipmentId: number;
+  shipmentId: string;
 }
 
 export class GeocodeAddressDto {
