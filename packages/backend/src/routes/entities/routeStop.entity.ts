@@ -1,7 +1,7 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn, JoinColumn } from 'typeorm';
 import { Route } from './route.entity';
 import { Shipment } from '../../shipments/entities/shipment.entity';
-import { StopType } from '../route-optimization.service';
+import { StopType } from '../types/location.types';
 
 @Entity()
 export class RouteStop {

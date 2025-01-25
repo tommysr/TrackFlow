@@ -6,13 +6,12 @@ export enum RouteStatus {
 }
 
 export interface RouteMetrics {
-  progress?: {
-    completedStops: number;
-    totalStops: number;
-    completedDistance: number;
-    remainingDistance: number;
-    isDelayed: boolean;
-  };
+  completedStops: number;
+  totalStops: number;
+  completedDistance: number;
+  remainingDistance: number;
+  isDelayed: boolean;
+  delayMinutes?: number;
 }
 
 export interface Route {
@@ -23,8 +22,8 @@ export interface Route {
   estimatedTime: number;
   date: string;
   status: RouteStatus;
-  metrics?: RouteMetrics;
-  stops?: RouteStop[];
+  metrics: RouteMetrics;
+  stops: RouteStop[];
   startedAt?: string;
   fullPath: {
     type: 'LineString';
@@ -34,7 +33,7 @@ export interface Route {
 
 export interface RouteStop {
   id: string;
-  shipmentId: number;
+  shipmentId?: string;
   stopType: 'PICKUP' | 'DELIVERY' | 'START' | 'END';
   sequenceIndex: number;
   location: {
@@ -43,4 +42,15 @@ export interface RouteStop {
   };
   estimatedArrival: string;
   actualArrival?: string;
-} 
+  shipment?: {
+    id: string;
+  };
+}
+
+export interface RouteDelay {
+  id: string;
+  delayMinutes: number;
+  recordedAt: Date;
+}
+
+export type MarkerType = 'S' | 'E' | 'P' | 'D' | 'C'; 

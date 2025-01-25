@@ -7,12 +7,15 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToOne,
 } from 'typeorm';
-import { Shipment } from '../../shipments/entities/shipment.entity';
 import { Carrier } from '../../carriers/entities/carrier.entity';
 import { RouteSegment } from './routeSegment.entity';
 import { RouteStop } from './routeStop.entity';
 import { Transform } from 'class-transformer';
+import { RouteMetrics } from './route-metrics.entity';
+import { RouteDistanceMatrix } from './route-distance-matrix.entity';
+import { ShipmentRouteHistory } from './shipment-route-history.entity';
 
 export enum RouteStatus {
   PENDING = 'pending', // Route created but not started
@@ -33,8 +36,6 @@ export class Route {
   @Transform(({ value }) => Number(value))
   totalDistance: number; // in kilometers
 
-  // @Column('decimal', { precision: 10, scale: 2 })
-  // totalProfit: number; // in currency
   @Column('decimal', { precision: 10, scale: 2 })
   @Transform(({ value }) => Number(value))
   totalFuelCost: number; // in currency
@@ -46,12 +47,6 @@ export class Route {
   @Column('decimal', { precision: 10, scale: 2 })
   @Transform(({ value }) => Number(value))
   estimatedTime: number; // in minutes
-
-  // @Column('decimal', { precision: 10, scale: 6, nullable: true })
-  // currentLatitude: number;
-
-  // @Column('decimal', { precision: 10, scale: 6, nullable: true })
-  // currentLongitude: number;
 
   @Column('timestamp')
   date: Date;
@@ -90,34 +85,17 @@ export class Route {
   })
   fullPath?: object;
 
-  // optionally
-  @Column('jsonb', { nullable: true })
-  distanceMatrix?: {
-    durations: number[][]; // seconds
-    distances: number[][]; // meters
-  };
+  @OneToOne(() => RouteMetrics, metrics => metrics.route, { cascade: true, onDelete: 'CASCADE' })
+  metrics: RouteMetrics;
 
-  // right now leave it as it is, cause its only used without more broad joins
-  @Column('jsonb', { nullable: true })
-  metrics?: {
-    actualTotalTime?: number;
-    actualFuelConsumption?: number;
-    deviationFromOptimal?: number;
-    progress?: {
-      completedStops: number;
-      totalStops: number;
-      completedDistance: number;
-      remainingDistance: number;
-      isDelayed: boolean;
-      delayMinutes?: number;
-    };
-  };
+  @OneToOne(() => RouteDistanceMatrix, matrix => matrix.route, { cascade: true, onDelete: 'CASCADE' })
+  distanceMatrix: RouteDistanceMatrix;
 
   // optional
-  @OneToMany(() => RouteStop, stop => stop.route, { cascade: true })
+  @OneToMany(() => RouteStop, stop => stop.route, { cascade: true, onDelete: 'CASCADE' })
   stops: RouteStop[];
 
-  @OneToMany(() => RouteSegment, segment => segment.route, { cascade: true })
+  @OneToMany(() => RouteSegment, segment => segment.route, { cascade: true, onDelete: 'CASCADE' })
   segments: RouteSegment[];
 
   @Column({ type: 'timestamp', nullable: true })
@@ -125,4 +103,7 @@ export class Route {
 
   @Column({ type: 'timestamp', nullable: true })
   completedAt: Date;
+
+  @OneToMany(() => ShipmentRouteHistory, history => history.route, { cascade: true, onDelete: 'CASCADE' })
+  shipmentHistory: ShipmentRouteHistory[];
 }

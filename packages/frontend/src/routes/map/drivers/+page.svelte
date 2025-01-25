@@ -14,7 +14,7 @@
   import type { MapContext } from 'svelte-maplibre/dist/context';
   import { getContext, onDestroy } from 'svelte';
   import { formatDistance, formatDuration, formatDateTime } from '$lib/format';
-  import { RouteStatus, type Route } from './types';
+  import { RouteStatus, type Route } from '$lib/types/route.types';
   import ActiveRoute from '$components/ActiveRoute.svelte';
   import { locationTracking } from '$src/lib/stores/locationTracking.svelte';
   import { addDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -907,7 +907,7 @@
                       </div>
                       <div>Scheduled: {formatDateTime(route.date)}</div>
                       <div>
-                        Stops: {route.metrics?.progress?.totalStops || 0}
+                        Stops: {route.metrics?.totalStops || 0}
                       </div>
                     </div>
                   </div>

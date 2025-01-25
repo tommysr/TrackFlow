@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Route, RouteStop } from '../routes/map/drivers/types';
+  import type { Route, RouteStop, MarkerType } from '$lib/types/route.types';
   import { formatDistance, formatDateTime, formatDuration } from '$lib/format';
   import { getContext } from 'svelte';
   import type { MapContext } from 'svelte-maplibre/dist/context';
@@ -7,7 +7,7 @@
   import { LngLatBounds } from 'maplibre-gl';
   import { onDestroy } from 'svelte';
   import { authenticatedFetch } from '$lib/canisters';
-  import { locationTracking } from '$src/lib/stores/locationTracking.svelte';
+  import { locationTracking } from '$lib/stores/locationTracking.svelte';
   
   let { route }: { route: Route } = $props();
   let isTestMode = $state(false);
@@ -27,7 +27,7 @@
     }
   }
 
-  function getMarkerType(stopType: string): 'S' | 'E' | 'P' | 'D'  {
+  function getMarkerType(stopType: string): MarkerType {
     switch(stopType) {
       case 'START':
         return 'S';
@@ -76,11 +76,9 @@
       if (!isTestMode) return;
       
       try {
-        const response = await locationTracking.updateTestLocation(e.lngLat.lng, e.lngLat.lat);
-        
-        if (response.ok) {
-          const { updatedRoute } = await response.json();
-          route = updatedRoute;
+        const locationUpdate = await locationTracking.updateTestLocation(e.lngLat.lng, e.lngLat.lat);
+        if (locationUpdate) {
+          route = locationUpdate.updatedRoute;
         }
       } catch (error) {
         console.error('Failed to update test location:', error);
@@ -162,6 +160,12 @@
       if (map.getSource('active-route')) map.removeSource('active-route');
     }
   });
+
+  $effect(() => {
+    if (locationTracking.lastLocationUpdate) {
+      route = locationTracking.lastLocationUpdate.updatedRoute;
+    }
+  });
 </script>
 
 <div class="border rounded-lg p-4 bg-white shadow-sm">
@@ -185,7 +189,7 @@
     <div class="text-sm text-gray-600 space-y-1">
       <div>Started: {route.startedAt ? formatDateTime(route.startedAt) : 'N/A'}</div>
       <div class="flex items-center gap-2">
-        <span>Progress: {route.metrics?.progress?.completedStops || 0}/{shipmentStops.length} stops</span>
+        <span>Progress: {route.metrics?.completedStops || 0}/{shipmentStops.length} stops</span>
         {#if locationTracking.isTracking}
           <span class="text-xs text-blue-500">
             {locationTracking.lastUpdate 
@@ -196,10 +200,10 @@
           <span class="text-xs text-yellow-500">Location tracking disabled</span>
         {/if}
       </div>
-      {#if route.metrics?.progress?.remainingDistance}
-        <div>Remaining distance: {formatDistance(route.metrics.progress.remainingDistance)}</div>
+      {#if route.metrics?.remainingDistance}
+        <div>Remaining distance: {formatDistance(route.metrics.remainingDistance)}</div>
       {/if}
-      {#if route.metrics?.progress?.isDelayed}
+      {#if route.metrics?.isDelayed}
         <div class="text-red-500">Route is delayed</div>
       {/if}
     </div>
@@ -215,9 +219,9 @@
             <span class="text-gray-500">Shipment #{currentStop.shipmentId}</span>
           {/if}
         </div>
-        <div>ETA: {formatDateTime(currentStop.estimatedArrival)}</div>
-        {#if route.metrics?.progress?.remainingDistance}
-          <div>Distance: {formatDistance(route.metrics.progress.remainingDistance)}</div>
+        <div>ETA: {currentStop.estimatedArrival ? formatDateTime(currentStop.estimatedArrival) : 'N/A'}</div>
+        {#if route.metrics?.remainingDistance}
+          <div>Distance: {formatDistance(route.metrics.remainingDistance)}</div>
         {/if}
       </div>
     </div>
@@ -240,7 +244,7 @@
                 <span class="text-gray-500">Shipment #{stop.shipmentId}</span>
               {/if}
             </div>
-            <div class="text-gray-600">ETA: {formatDateTime(stop.estimatedArrival)}</div>
+            <div class="text-gray-600">ETA: {stop.estimatedArrival ? formatDateTime(stop.estimatedArrival) : 'N/A'}</div>
           </div>
         {/each}
       </div>
@@ -286,3 +290,46 @@
     />
   {/if}
 {/if}
+
+<div class="space-y-4">
+  <!-- Route Progress -->
+  {#if locationTracking.routeProgress}
+    <div class="bg-white rounded-lg p-4 shadow">
+      <h3 class="font-semibold mb-2">Route Progress</h3>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <div class="text-sm text-gray-600">Completed Stops</div>
+          <div class="font-medium">
+            {locationTracking.routeProgress.completedStops} / {locationTracking.routeProgress.totalStops}
+          </div>
+        </div>
+        <div>
+          <div class="text-sm text-gray-600">Remaining Distance</div>
+          <div class="font-medium">
+            {formatDistance(locationTracking.routeProgress.remainingDistance)}
+          </div>
+        </div>
+      </div>
+      
+      {#if locationTracking.routeProgress.isDelayed}
+        <div class="mt-2 text-red-500 text-sm">
+          Route is delayed by {locationTracking.routeProgress.delayMinutes} minutes
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Next Stop Preview -->
+  {#if locationTracking.lastLocationUpdate?.updatedStops[0]}
+    <div class="bg-blue-50 p-4 rounded-lg">
+      <h3 class="font-semibold mb-2">Next Stop</h3>
+      <div class="text-sm">
+        <div>ETA: { locationTracking.routeProgress?.nextStopEta ? formatDateTime(locationTracking.routeProgress?.nextStopEta?.toISOString()) : 'N/A'}</div>
+        <div>Type: {locationTracking.lastLocationUpdate.updatedStops[0].stopType}</div>
+        {#if locationTracking.lastLocationUpdate.updatedStops[0].shipment}
+          <div>Shipment: #{locationTracking.lastLocationUpdate.updatedStops[0].shipment.id}</div>
+        {/if}
+      </div>
+    </div>
+  {/if}
+</div>

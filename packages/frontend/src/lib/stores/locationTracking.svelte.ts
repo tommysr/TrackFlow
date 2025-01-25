@@ -1,4 +1,21 @@
 import { authenticatedFetch } from '$lib/canisters';
+import type { Route, RouteStop, RouteDelay } from '../types/route.types';
+
+interface RouteProgress {
+  completedStops: number;
+  totalStops: number;
+  completedDistance: number;
+  remainingDistance: number;
+  isDelayed: boolean;
+  delayMinutes?: number;
+  nextStopEta?: Date;
+}
+
+interface LocationUpdate {
+  updatedRoute: Route;
+  updatedStops: RouteStop[];
+  delays: RouteDelay[];
+}
 
 export class LocationTrackingStore {
   isTracking = $state(false);
@@ -6,6 +23,8 @@ export class LocationTrackingStore {
   lastUpdate = $state<Date | null>(null);
   lastLocation = $state<{ latitude: number; longitude: number } | null>(null);
   isTestMode = $state(false);
+  routeProgress = $state<RouteProgress | null>(null);
+  lastLocationUpdate = $state<LocationUpdate | null>(null);
   
   private intervalId: NodeJS.Timeout | null = null;
 
@@ -18,6 +37,7 @@ export class LocationTrackingStore {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
+          // Update location
           const response = await authenticatedFetch('http://localhost:5000/routes/active/location', {
             method: 'POST',
             body: JSON.stringify({
@@ -28,6 +48,14 @@ export class LocationTrackingStore {
           });
           
           if (response.ok) {
+            this.lastLocationUpdate = await response.json();
+            
+            // Get route progress
+            const progressResponse = await authenticatedFetch('http://localhost:5000/routes/active/progress');
+            if (progressResponse.ok) {
+              this.routeProgress = await progressResponse.json();
+            }
+
             this.error = null;
             this.lastUpdate = new Date();
             this.lastLocation = {
@@ -57,6 +85,8 @@ export class LocationTrackingStore {
     if (this.intervalId) clearInterval(this.intervalId);
     this.intervalId = null;
     this.isTracking = false;
+    this.routeProgress = null;
+    this.lastLocationUpdate = null;
   }
 
   toggleTestMode() {
@@ -75,10 +105,18 @@ export class LocationTrackingStore {
       });
       
       if (response.ok) {
+        this.lastLocationUpdate = await response.json();
+        
+        // Get route progress
+        const progressResponse = await authenticatedFetch('http://localhost:5000/routes/active/progress');
+        if (progressResponse.ok) {
+          this.routeProgress = await progressResponse.json();
+        }
+
         this.error = null;
         this.lastUpdate = new Date();
         this.lastLocation = { latitude: lat, longitude: lng };
-        return await response.json();
+        return this.lastLocationUpdate;
       }
     } catch (error) {
       this.error = "Failed to update test location";
