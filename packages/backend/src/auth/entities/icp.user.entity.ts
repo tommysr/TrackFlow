@@ -26,10 +26,4 @@ export class IcpUser {
 
   @Column({ nullable: true })
   contact: string;
-
-  // @OneToOne(() => Shipper, (shipper) => shipper.identity, { nullable: true })
-  // shipper: Shipper;
-
-  // @OneToOne(() => Carrier, (carrier) => carrier.identity, { nullable: true })
-  // carrier: Carrier;
 }

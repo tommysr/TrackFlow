@@ -5,11 +5,9 @@ import { ShipmentsService } from './shipments.service';
 import { ShipmentsSyncService } from './shipments-sync.service';
 import { AuthModule } from '../auth/auth.module';
 import { Shipment } from './entities/shipment.entity';
-import { GPSData } from 'src/gps/entities/gps-data.entity';
 import { Address } from './entities/address.entity';
 import { RoutesModule } from 'src/routes/routes.module';
 import { CommonModule } from 'src/common/common.module';
-import { GPSModule } from 'src/gps/gps.module';
 import { CoreModule } from 'src/core/core.module';
 import { CarriersModule } from 'src/carriers/carriers.module';
 import { RouteStop } from 'src/routes/entities/routeStop.entity';
@@ -22,7 +20,6 @@ import { ShipmentSequence } from './entities/shipment-sequence.entity';
   imports: [
     TypeOrmModule.forFeature([
       Shipment,
-      GPSData,
       Address,
       RouteStop,
       IcpUser,
@@ -31,7 +28,6 @@ import { ShipmentSequence } from './entities/shipment-sequence.entity';
       ShipmentSequence,
     ]),
     CoreModule,
-    GPSModule,
     CarriersModule,
     forwardRef(() => AuthModule),
     forwardRef(() => RoutesModule),

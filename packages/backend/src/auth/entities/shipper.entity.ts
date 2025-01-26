@@ -7,7 +7,6 @@ export class Shipper {
   @PrimaryColumn()
   principal: string;
 
-  // this refers to the principal of the shipper
   @OneToOne(() => IcpUser, {nullable: false})
   @JoinColumn({ name: 'principal' })
   user: IcpUser;

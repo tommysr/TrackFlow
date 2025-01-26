@@ -5,7 +5,6 @@ import { AuthModule } from './auth/auth.module';
 import { ShipmentsModule } from './shipments/shipments.module';
 import { CarriersModule } from './carriers/carriers.module';
 import { RoutesModule } from './routes/routes.module';
-import { GPSModule } from './gps/gps.module';
 
 const configFactory = () => {
   console.log('Environment variables:');
@@ -81,7 +80,6 @@ const configFactory = () => {
     ShipmentsModule,
     CarriersModule,
     RoutesModule,
-    GPSModule
   ],
   providers: [],
 })

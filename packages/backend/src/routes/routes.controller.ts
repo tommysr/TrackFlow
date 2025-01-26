@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { IcpUser, UserRole } from '../auth/entities/icp.user.entity';
 import { User } from '../auth/decorators/user.decorator';
 import { Route } from './entities/route.entity';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiBody, ApiParam } from '@nestjs/swagger';
 import { UpdateRouteDto } from './dto/update-route.dto';
 import { RouteSimulation } from './dto/route-simulation.dto';
 import { ShipmentGuard } from 'src/auth/guards/shipment.guard';
@@ -30,11 +30,10 @@ export class RoutesController {
   ) {}
 
   @Post('simulate')
-  // @Roles(UserRole.CARRIER, UserRole.ADMIN)
-  // @UseGuards(ShipmentSyncGuard)
-  // @UseGuards(ShipmentGuard)
-  @ApiOperation({ summary: 'Simulate route without saving' })
-  @ApiResponse({ status: 200, type: RouteSimulation })
+  @ApiOperation({ summary: 'Simulate a route without saving' })
+  @ApiResponse({ status: 200, type: RouteSimulation, description: 'Route simulation results' })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiBody({ type: CreateRouteDto })
   async simulateRoute(
     @User() user: IcpUser,
     @Body() createRouteDto: CreateRouteDto,
@@ -53,8 +52,10 @@ export class RoutesController {
   // }
 
   @Post()
-  @ApiOperation({ summary: 'Create optimized route' })
-  @ApiResponse({ status: 201, type: Route })
+  @ApiOperation({ summary: 'Create a new optimized route' })
+  @ApiResponse({ status: 201, type: Route, description: 'Route created successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiBody({ type: CreateRouteDto })
   async createRoute(
     @User() user: IcpUser,
     @Body() createRouteDto: CreateRouteDto,
@@ -64,15 +65,18 @@ export class RoutesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all routes' })
-  @ApiResponse({ status: 200, type: [RouteWithActivationDto] })
+  @ApiOperation({ summary: 'Get all routes for the authenticated user' })
+  @ApiResponse({ status: 200, type: [RouteWithActivationDto], description: 'List of routes' })
   async getRoutes(@User() user: IcpUser): Promise<RouteWithActivationDto[]> {
     return this.routesService.findAllByUser(user);
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Update route' })
-  @ApiResponse({ status: 200, type: Route })
+  @ApiOperation({ summary: 'Update a route' })
+  @ApiResponse({ status: 200, type: Route, description: 'Route updated successfully' })
+  @ApiResponse({ status: 404, description: 'Route not found' })
+  @ApiParam({ name: 'id', type: String, description: 'Route ID' })
+  @ApiBody({ type: UpdateRouteDto })
   async updateRoute(
     @User() user: IcpUser,
     @Param('id') id: string,
@@ -82,8 +86,10 @@ export class RoutesController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete route' })
-  @ApiResponse({ status: 204 })
+  @ApiOperation({ summary: 'Delete a route' })
+  @ApiResponse({ status: 204, description: 'Route deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Route not found' })
+  @ApiParam({ name: 'id', type: String, description: 'Route ID' })
   async deleteRoute(
     @User() user: IcpUser,
     @Param('id') id: string
@@ -92,7 +98,10 @@ export class RoutesController {
   }
 
   @Post(':id/activate')
-  @Roles(UserRole.CARRIER)
+  @ApiOperation({ summary: 'Activate a route' })
+  @ApiResponse({ status: 200, type: Route, description: 'Route activated successfully' })
+  @ApiResponse({ status: 404, description: 'Route not found' })
+  @ApiParam({ name: 'id', type: String, description: 'Route ID' })
   async activateRoute(
     @Param('id') id: string,
     @User() user: IcpUser,
@@ -101,6 +110,9 @@ export class RoutesController {
   }
 
   @Get('active')
+  @ApiOperation({ summary: 'Get currently active route' })
+  @ApiResponse({ status: 200, type: Route, description: 'Active route' })
+  @ApiResponse({ status: 404, description: 'No active route found' })
   @Roles(UserRole.CARRIER)
   async getActiveRoute(
     @User() user: IcpUser,
@@ -109,6 +121,9 @@ export class RoutesController {
   }
 
   @Post('active/location')
+  @ApiOperation({ summary: 'Update active route location' })
+  @ApiResponse({ status: 200, description: 'Location updated successfully' })
+  @ApiBody({ type: UpdateLocationDto })
   @Roles(UserRole.CARRIER)
   async updateLocation(
     @User() user: IcpUser,
