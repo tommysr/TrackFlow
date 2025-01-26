@@ -27,13 +27,4 @@ export class RouteMetrics {
 
   @Column('int', { nullable: true })
   delayMinutes?: number;
-
-  @Column('decimal', { precision: 10, scale: 2, nullable: true })
-  actualTotalTime?: number;
-
-  @Column('decimal', { precision: 10, scale: 2, nullable: true })
-  actualFuelConsumption?: number;
-
-  @Column('decimal', { precision: 10, scale: 2, nullable: true })
-  deviationFromOptimal?: number;
-} 
+}
