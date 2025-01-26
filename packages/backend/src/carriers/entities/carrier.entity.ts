@@ -53,5 +53,5 @@ export class Carrier {
     srid: 4326,
     nullable: true,
   })
-  currentLocation?: object; // or { type: 'Point', coordinates: [lng, lat] }
+  currentLocation?: object; 
 } 
