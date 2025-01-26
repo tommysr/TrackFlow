@@ -28,7 +28,6 @@ pub enum ShipmentEvent {
         carrier: Principal,
     },
     Finalized {
-        party: Principal,
         shipment_id: ShipmentIdInner,
     },
 }
@@ -137,6 +136,10 @@ async fn finalize_shipment(
                 .get_mut(&shipment_id)
                 .ok_or(anyhow!("Shipment not found"))?;
 
+            if ic_cdk::caller() != shipment.carrier_id().ok_or(anyhow!("Carrier not set"))? {
+                return Err(anyhow!("Caller is not the carrier"));
+            }
+
             CUSTOMERS.with_borrow_mut(|customers| {
                 let customer = customers
                     .get_mut(&shipment.customer_id())
@@ -159,10 +162,7 @@ async fn finalize_shipment(
         .map_err(|e: anyhow::Error| e.to_string())?;
 
     if finalize_result.is_ok() {
-        add_event(ShipmentEvent::Finalized {
-            shipment_id,
-            party: caller,
-        });
+        add_event(ShipmentEvent::Finalized { shipment_id });
     }
 
     finalize_result.map_err(|e| e.to_string())
@@ -310,9 +310,9 @@ fn purge_old_events() -> Result<(), String> {
     let current_time_secs = current_time / 1_000_000_000;
 
     EVENTS.with(|events| {
-        events.borrow_mut().retain(|e| {
-            current_time_secs - e.timestamp < MAX_EVENTS_AGE
-        });
+        events
+            .borrow_mut()
+            .retain(|e| current_time_secs - e.timestamp < MAX_EVENTS_AGE);
     });
 
     Ok(())

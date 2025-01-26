@@ -17,6 +17,7 @@ import { RouteStop } from './entities/routeStop.entity';
 import { Shipment } from 'src/shipments/entities/shipment.entity';
 import { RouteDelay } from './entities/route-delay.entity';
 import { RouteMetrics } from './entities/route-metrics.entity';
+import { RouteWithActivationDto } from './dto/route-with-activation.dto';
 
 @ApiTags('routes')
 @Controller('routes')
@@ -58,13 +59,14 @@ export class RoutesController {
     @User() user: IcpUser,
     @Body() createRouteDto: CreateRouteDto,
   ): Promise<Route> {
+    console.log(typeof createRouteDto.estimatedStartTime);
     return this.routesService.createOptimizedRoute(createRouteDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all routes' })
-  @ApiResponse({ status: 200, type: [Route] })
-  async getRoutes(@User() user: IcpUser): Promise<Route[]> {
+  @ApiResponse({ status: 200, type: [RouteWithActivationDto] })
+  async getRoutes(@User() user: IcpUser): Promise<RouteWithActivationDto[]> {
     return this.routesService.findAllByUser(user);
   }
 
@@ -115,6 +117,7 @@ export class RoutesController {
     updatedRoute: Route;
     updatedStops: RouteStop[];
     delays: RouteDelay[];
+    updatedShipments: Shipment[];
   }> {
     return this.routeTrackingService.updateCarrierLocation(
       user.principal,

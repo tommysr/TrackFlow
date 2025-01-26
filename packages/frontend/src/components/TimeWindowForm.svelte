@@ -26,27 +26,21 @@
       if (timeWindows.pickup) {
         pickupStart = timeWindows.pickup.start;
         pickupEnd = timeWindows.pickup.end;
-      } else {
-        pickupStart = new Date();
-        pickupEnd = new Date();
-      }
+      } 
       if (timeWindows.delivery) {
         deliveryStart = timeWindows.delivery.start;
         deliveryEnd = timeWindows.delivery.end;
-      } else {
-        deliveryStart = new Date();
-        deliveryEnd = new Date();
-      }
+      } 
     } catch (error) {
       console.error('Failed to fetch time windows', error);
     }
   }
 
-  let pickupStart: Date | null = $state(null);
-  let pickupEnd: Date | null = $state(null);
-  let deliveryStart: Date | null = $state(null);
-  let deliveryEnd: Date | null = $state(null);
-  let error: string | null = $state(null);
+  let pickupStart: Date = $state(new Date());
+  let pickupEnd: Date = $state(new Date());
+  let deliveryStart: Date = $state(new Date());
+  let deliveryEnd: Date = $state(new Date());
+  let error: string = $state('');
   let isLoading = $state(false);
 
   $effect(() => {
@@ -57,7 +51,7 @@
 
   async function setTimeWindows(e: Event) {
     e.preventDefault();
-    error = null;
+    error = '';
     isLoading = true;
 
     try {
@@ -116,6 +110,7 @@
           <input
             type="datetime-local"
             id="pickupStart"
+            min={new Date().toISOString().slice(0, 16)}
             bind:value={pickupStart}
             class="w-full rounded-lg border-2 border-gray-300 p-2"
             required
@@ -126,6 +121,7 @@
           <input
             type="datetime-local"
             id="pickupEnd"
+            min={new Date().toISOString().slice(0, 16)}
             bind:value={pickupEnd}
             class="w-full rounded-lg border-2 border-gray-300 p-2"
             required
@@ -140,6 +136,7 @@
           <input
             type="datetime-local"
             id="deliveryStart"
+            min={new Date().toISOString().slice(0, 16)}
             bind:value={deliveryStart}
             class="w-full rounded-lg border-2 border-gray-300 p-2"
             required
@@ -150,6 +147,7 @@
           <input
             type="datetime-local"
             id="deliveryEnd"
+            min={new Date().toISOString().slice(0, 16)}
             bind:value={deliveryEnd}
             class="w-full rounded-lg border-2 border-gray-300 p-2"
             required

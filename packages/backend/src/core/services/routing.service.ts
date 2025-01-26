@@ -23,6 +23,7 @@ export interface RouteUpdateResult {
   remainingDuration: number;
   segments: RouteSegmentUpdate[];
   updatedStops: StopUpdate[];
+  routeGeometry: GeoLineString;
 }
 
 @Injectable()
@@ -35,14 +36,10 @@ export class RoutingService {
     currentLocation: LocationDto,
     stops: RouteStop[],
   ): Promise<RouteUpdateResult> {
-    // Get remaining stops in sequence, including all uncompleted stops
-
-    console.log('stops', stops);
+    
     const remainingStops = stops
       .filter((stop) => !stop.actualArrival && stop.stopType !== StopType.START)
       .sort((a, b) => a.sequenceIndex - b.sequenceIndex);
-
-    console.log('remainingStops', remainingStops);
 
     if (remainingStops.length === 0) {
       return {
@@ -50,6 +47,7 @@ export class RoutingService {
         remainingDuration: 0,
         segments: [],
         updatedStops: [],
+        routeGeometry: null,
       };
     }
 
@@ -58,7 +56,7 @@ export class RoutingService {
       {
         lat: currentLocation.lat,
         lng: currentLocation.lng,
-        type: StopType.START, //i it doesnt maktter
+        type: StopType.START,
       },
       ...remainingStops.map((stop) => ({
         lat: (stop.location as GeoPoint).coordinates[1],
@@ -78,24 +76,24 @@ export class RoutingService {
     const segments: RouteSegmentUpdate[] = [];
 
     const routeSegments = routeDetails.data.features[0].properties.segments;
-    const routeGeometry = routeDetails.data.features[0].geometry.coordinates;
+    const routeGeometry = routeDetails.data.features[0].geometry;
 
     // Find the first stop's original ETA to use as base time
-    const baseTime = stops[0]?.estimatedArrival?.getTime() || Date.now();
+    const startStopTime = stops[0]?.estimatedArrival?.getTime()
 
     routeSegments.forEach((segment, index) => {
       // Use way_points to get the correct coordinate indices
       const startIdx = segment.steps[0].way_points[0];
       const endIdx = segment.steps[segment.steps.length - 1].way_points[1];
-      const segmentCoordinates = routeGeometry.slice(startIdx, endIdx + 1);
+      const segmentCoordinates = routeGeometry.coordinates.slice(startIdx, endIdx + 1);
 
-      cumulativeTime += segment.duration;
+      cumulativeTime += Number(segment.duration);
       const stop = remainingStops[index];
 
       if (stop) {
         updatedStops.push({
           id: stop.id,
-          estimatedArrival: new Date(baseTime + cumulativeTime * 1000),
+          estimatedArrival: new Date(startStopTime + cumulativeTime * 1000),
         });
       }
 
@@ -110,8 +108,8 @@ export class RoutingService {
               type: 'LineString',
               coordinates: segmentCoordinates
             },
-            distance: segment.distance,
-            duration: segment.duration,
+            distance: Number(segment.distance),
+            duration: Number(segment.duration),
           });
         }
       }
@@ -122,6 +120,7 @@ export class RoutingService {
       remainingDuration: duration / 60, // Convert to minutes
       segments,
       updatedStops,
+      routeGeometry,
     };
   }
 }

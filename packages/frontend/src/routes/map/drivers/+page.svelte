@@ -14,7 +14,7 @@
   import type { MapContext } from 'svelte-maplibre/dist/context';
   import { getContext, onDestroy } from 'svelte';
   import { formatDistance, formatDuration, formatDateTime } from '$lib/format';
-  import { RouteStatus, type Route } from '$lib/types/route.types';
+  import { RouteStatus, type Route, type RouteWithActivation } from '$lib/types/route.types';
   import ActiveRoute from '$components/ActiveRoute.svelte';
   import { locationTracking } from '$src/lib/stores/locationTracking.svelte';
   import { addDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -27,10 +27,10 @@
   let isWalletConnected = $state(true);
   let selectedNav = $state(0);
   let selectedShipments = $state<Set<string>>(new Set());
-  let selectedRoute = $state<Route | null>(null);
+  let selectedRoute = $state<RouteWithActivation | null>(null);
   let isCreatingRoute = $state(false);
   let routePreview = $state(null);
-  let routes: Route[] = $state([]);
+  let routes: RouteWithActivation[] = $state([]);
   let activeRoute: Route | null = $state(null);
   let routesLoading = $state(false);
   let startLocation = $state<{ lat: number; lng: number } | null>(null);
@@ -208,7 +208,7 @@
           method: 'POST',
           body: JSON.stringify({
             shipments: shipmentOperationsMapped,
-            estimatedStartTime: scheduledDate,
+            estimatedStartTime: new Date(scheduledDate).toISOString(),
             startLocation: startLocation,
             ...(endLocation && { endLocation }),
           }),
@@ -268,7 +268,7 @@
               id,
               type: shipmentOperations.get(id),
             })),
-            estimatedStartTime: scheduledDate,
+            estimatedStartTime: new Date(scheduledDate).toISOString(),
             startLocation,
             ...(endLocation && {
               endLocation,
@@ -322,10 +322,10 @@
       }
 
       if (!routesResponse.ok) throw new Error('Failed to load routes');
-      const routesData: Route[] = await routesResponse.json();
+      const routesData: RouteWithActivation[] = await routesResponse.json();
 
       // Filter out active route from general routes list
-      routes = routesData.filter((r) => r.status !== 'active');
+      routes = routesData.filter((r) => r.route.status !== 'active');
 
     } catch (error) {
       console.error('Failed to load routes:', error);
@@ -339,7 +339,7 @@
       await authenticatedFetch(`http://localhost:5000/routes/${id}`, {
         method: 'DELETE',
       });
-      routes = routes.filter((route) => route.id !== id);
+      routes = routes.filter((route) => route.route.id !== id);
     } catch (error) {
       console.error('Failed to delete route:', error);
     }
@@ -881,64 +881,85 @@
             class="flex-1 flex w-full flex-col overflow-y-auto px-4 py-2 space-y-4"
           >
             {#each routes as route}
-              <div class="border rounded-lg p-4 shadow-sm">
-                <div class="flex justify-between items-start">
-                  <div>
-                    <div class="font-semibold">
-                      Route #{route.id.slice(0, 8)}
-                      <span
-                        class="ml-2 px-2 py-1 text-sm rounded-full {route.status ===
-                        RouteStatus.PENDING
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : route.status === RouteStatus.COMPLETED
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-red-100 text-red-800'}"
-                      >
-                        {route.status}
-                      </span>
-                    </div>
-
-                    <div class="mt-2 text-sm text-gray-600">
-                      <div>
-                        Distance: {formatDistance(route.totalDistance)}
-                      </div>
-                      <div>
-                        Duration: {formatDuration(route.estimatedTime)}
-                      </div>
-                      <div>Scheduled: {formatDateTime(route.date)}</div>
-                      <div>
-                        Stops: {route.metrics?.totalStops || 0}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="flex gap-2">
-                    {#if route.status === 'pending'}
-                      <button
-                        class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                        onclick={() => activateRoute(route.id)}
-                      >
-                        Activate
-                      </button>
-                    {/if}
-
-                    <button
-                      class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                      onclick={() => (selectedRoute = route)}
+              {@const now = new Date()}
+              {@const canActivate = route.route.status === RouteStatus.PENDING && route.latestActivationTime && now < new Date(route.latestActivationTime)}
+              {@const timeToActivate = canActivate ? Math.floor((new Date(route.latestActivationTime!).getTime() - now.getTime()) / (1000 * 60)) : 0}
+              {@const hours = Math.floor(timeToActivate / 60)}
+              {@const minutes = timeToActivate % 60}
+              {@const timeDisplay = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`}
+              
+              <div class="bg-white rounded-lg shadow p-4 space-y-3 hover:ring-2 hover:ring-blue-200">
+                <div class="flex justify-between items-center">
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-lg font-semibold">Route #{route.route.id.slice(0, 8)}</h3>
+                    <span
+                      class="px-2 py-1 text-sm rounded-full {route.route.status === RouteStatus.PENDING
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : route.route.status === RouteStatus.COMPLETED
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-red-100 text-red-800'}"
                     >
-                      Details
-                    </button>
-
-                    {#if route.status === 'pending'}
-                      <button
-                        class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                        onclick={() => deleteRoute(route.id)}
-                      >
-                        Delete
-                      </button>
+                      {route.route.status}
+                    </span>
+                  </div>
+                    {#if route.route.status === RouteStatus.PENDING}
+                      <span class="{canActivate ? 'text-green-600' : 'text-red-500'} text-sm">
+                        {canActivate ? `Activate in ${timeDisplay}` : `Expired`}
+                      </span>
                     {/if}
+              
+                 
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <span class="text-sm text-gray-500">Total Distance</span>
+                    <p class="font-medium">{formatDistance(route.route.totalDistance)}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm text-gray-500">Duration</span>
+                    <p class="font-medium">{formatDuration(route.route.estimatedTime)}</p>
                   </div>
                 </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <span class="text-sm text-gray-500">Scheduled Start</span>
+                    <p class="font-medium">{formatDateTime(route.route.date)}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm text-gray-500">Stops</span>
+                    <p class="font-medium">{route.route.metrics?.totalStops || 0} locations</p>
+                  </div>
+                </div>
+
+                <div class="flex gap-2">
+                  {#if route.route.status === RouteStatus.PENDING}
+                    <button
+                      class="px-3 py-1 {canActivate ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded"
+                      onclick={() => canActivate && activateRoute(route.route.id)}
+                      disabled={!canActivate}
+                      title={!canActivate ? 'Route cannot be activated - outside of time windows' : undefined}
+                    >
+                      Activate
+                    </button>
+                  {/if}
+   
+                  {#if route.route.status === RouteStatus.PENDING}
+                    <button
+                      class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                      onclick={() => deleteRoute(route.route.id)}
+                    >
+                      Delete
+                    </button>
+                  {/if}
+                </div>
+
+                {#if route.route.metrics?.isDelayed}
+                  <div class="text-red-500 text-sm">
+                    Route is delayed
+                  </div>
+                {/if}
               </div>
             {/each}
           </div>

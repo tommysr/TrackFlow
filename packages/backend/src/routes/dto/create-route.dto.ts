@@ -38,6 +38,5 @@ export class CreateRouteDto {
 
   @ApiProperty()
   @IsDateString()
-  @Transform(({ value }) => new Date(value))
   estimatedStartTime: Date;
 } 

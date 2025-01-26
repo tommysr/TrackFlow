@@ -12,16 +12,17 @@
   let { route }: { route: Route } = $props();
   let isTestMode = $state(false);
   
-  function getStopColor(stopType: string): string {
+  function getStopColor(stopType: string, isDelayed: boolean = false): string {
+    if (isDelayed) return 'var(--error-500)';
     switch(stopType) {
-      case 'START':
-        return 'var(--accent-500)';
-      case 'END':
-        return 'var(--accent-500)';
       case 'PICKUP':
         return 'var(--primary-500)';
       case 'DELIVERY':
         return 'var(--secondary-500)';
+      case 'START':
+        return 'var(--success-500)';
+      case 'END':
+        return 'var(--warning-500)';
       default:
         return 'var(--primary-200)';
     }
@@ -29,19 +30,20 @@
 
   function getMarkerType(stopType: string): MarkerType {
     switch(stopType) {
-      case 'START':
-        return 'S';
-      case 'END':
-        return 'E';
       case 'PICKUP':
         return 'P';
       case 'DELIVERY':
         return 'D';
+      case 'START':
+        return 'S';
+      case 'END':
+        return 'E';
       default:
         return 'S';
     }
   }
-  // Filter out START/END points and sort by sequence
+
+  // Filter out START/END points and sort by sequence for the list view
   let shipmentStops = $derived.by(() => {
     return route.stops?.filter(stop => 
       stop.stopType === 'PICKUP' || stop.stopType === 'DELIVERY'
@@ -56,6 +58,13 @@
     const currentIndex = currentStop?.sequenceIndex || 0;
     return shipmentStops.filter(s => s.sequenceIndex > currentIndex);
   });
+
+  // Calculate minutes until ETA for a stop
+  function getETAMinutes(estimatedArrival: string): number {
+    const eta = new Date(estimatedArrival);
+    const now = new Date();
+    return Math.round((eta.getTime() - now.getTime()) / (1000 * 60));
+  }
 
   // Start tracking if not already tracking
   $effect(() => {
@@ -114,7 +123,7 @@
           'line-cap': 'round',
         },
         paint: {
-          'line-color': '#22c55e', // Green color for active route
+          'line-color': '#22c55e',
           'line-width': 4,
           'line-opacity': 0.8,
         },
@@ -168,9 +177,10 @@
   });
 </script>
 
-<div class="border rounded-lg p-4 bg-white shadow-sm">
-  <div class="mb-4">
-    <div class="flex justify-between items-center">
+<div class="border rounded-lg p-4 bg-white shadow-sm space-y-4">
+  <!-- Header with Route Info -->
+  <div>
+    <div class="flex justify-between items-center mb-2">
       <h3 class="font-semibold text-lg">Active Route #{route.id.slice(0,8)}</h3>
       <button
         class={`px-2 py-1 rounded text-sm ${isTestMode ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100'}`}
@@ -186,14 +196,18 @@
       </div>
     {/if}
 
-    <div class="text-sm text-gray-600 space-y-1">
-      <div>Started: {route.startedAt ? formatDateTime(route.startedAt) : 'N/A'}</div>
+    <!-- Route Timing Information -->
+    <div class="text-sm text-gray-600 space-y-1 mt-2">
+      <div>Activated: {route.startedAt ? formatDateTime(route.startedAt) : 'N/A'}</div>
+      {#if route.updatedAt}
+        <div>Last Update: {formatDateTime(route.updatedAt)}</div>
+      {/if}
       <div class="flex items-center gap-2">
         <span>Progress: {route.metrics?.completedStops || 0}/{shipmentStops.length} stops</span>
         {#if locationTracking.isTracking}
           <span class="text-xs text-blue-500">
             {locationTracking.lastUpdate 
-              ? `Last update: ${formatDateTime(locationTracking.lastUpdate.toISOString())}` 
+              ? `GPS Update: ${formatDateTime(locationTracking.lastUpdate.toISOString())}` 
               : 'Updating location...'}
           </span>
         {:else}
@@ -203,23 +217,33 @@
       {#if route.metrics?.remainingDistance}
         <div>Remaining distance: {formatDistance(route.metrics.remainingDistance)}</div>
       {/if}
-      {#if route.metrics?.isDelayed}
-        <div class="text-red-500">Route is delayed</div>
+      {#if locationTracking.routeProgress?.isDelayed}
+        <div class="text-red-500">
+          Route is delayed by {locationTracking.routeProgress.delayMinutes} minutes
+        </div>
       {/if}
     </div>
   </div>
 
+  <!-- Current Stop -->
   {#if currentStop}
-    <div class="bg-blue-50 p-3 rounded-lg mb-4">
+    <div class="bg-blue-50 p-3 rounded-lg">
       <div class="font-medium mb-2">Current Stop</div>
-      <div class="text-sm">
+      <div class="text-sm space-y-1">
         <div class="flex items-center gap-2">
           <span class="font-medium">{currentStop.stopType}</span>
           {#if currentStop.shipmentId}
             <span class="text-gray-500">Shipment #{currentStop.shipmentId}</span>
           {/if}
         </div>
-        <div>ETA: {currentStop.estimatedArrival ? formatDateTime(currentStop.estimatedArrival) : 'N/A'}</div>
+        {#if currentStop.estimatedArrival}
+          <div class="flex items-center gap-2">
+            <span>ETA: {getETAMinutes(currentStop.estimatedArrival)} min</span>
+            {#if locationTracking.routeProgress?.delayMinutes && locationTracking.routeProgress.delayMinutes > 0}
+              <span class="text-red-500">(+{locationTracking.routeProgress.delayMinutes}min)</span>
+            {/if}
+          </div>
+        {/if}
         {#if route.metrics?.remainingDistance}
           <div>Distance: {formatDistance(route.metrics.remainingDistance)}</div>
         {/if}
@@ -227,14 +251,15 @@
     </div>
   {/if}
 
+  <!-- Remaining Stops -->
   {#if remainingStops.length > 0}
     <div>
       <div class="font-medium mb-2">Next Stops</div>
       <div class="space-y-2">
         {#each remainingStops as stop}
-          <div class="bg-gray-50 p-2 rounded text-sm">
+          <div class="bg-gray-50 p-3 rounded text-sm">
             <div class="flex items-center justify-between">
-              <div>
+              <div class="flex items-center gap-2">
                 <span class="font-medium">Stop #{stop.sequenceIndex + 1}</span>
                 <span class={stop.stopType === 'PICKUP' ? 'text-blue-600' : 'text-green-600'}>
                   {stop.stopType}
@@ -244,7 +269,14 @@
                 <span class="text-gray-500">Shipment #{stop.shipmentId}</span>
               {/if}
             </div>
-            <div class="text-gray-600">ETA: {stop.estimatedArrival ? formatDateTime(stop.estimatedArrival) : 'N/A'}</div>
+            {#if stop.estimatedArrival}
+              <div class="flex items-center gap-2 mt-1">
+                <span>ETA: {getETAMinutes(stop.estimatedArrival)} min</span>
+                {#if locationTracking.routeProgress?.delayMinutes && locationTracking.routeProgress.delayMinutes > 0}
+                  <span class="text-red-500">(+{locationTracking.routeProgress.delayMinutes}min)</span>
+                {/if}
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
@@ -252,13 +284,15 @@
   {/if}
 
   {#if locationTracking.error}
-    <div class="bg-red-100 text-red-700 p-2 rounded mt-2 text-sm">
+    <div class="bg-red-100 text-red-700 p-2 rounded mt-4 text-sm">
       {locationTracking.error}
     </div>
   {/if}
 </div>
 
+<!-- Map Markers -->
 {#if map}
+  <!-- All route stops including START/END -->
   {#each route.stops || [] as stop}
     <Marker
       location={{ 
@@ -270,7 +304,7 @@
         : String(shipmentStops.findIndex(s => s.id === stop.id) + 1)}
       onClick={() => {}}
       active={!stop.actualArrival}
-      color={getStopColor(stop.stopType)}
+      color={getStopColor(stop.stopType, locationTracking.routeProgress?.isDelayed)}
       type={getMarkerType(stop.stopType)}
     />
   {/each}
@@ -291,45 +325,30 @@
   {/if}
 {/if}
 
-<div class="space-y-4">
-  <!-- Route Progress -->
-  {#if locationTracking.routeProgress}
-    <div class="bg-white rounded-lg p-4 shadow">
-      <h3 class="font-semibold mb-2">Route Progress</h3>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <div class="text-sm text-gray-600">Completed Stops</div>
-          <div class="font-medium">
-            {locationTracking.routeProgress.completedStops} / {locationTracking.routeProgress.totalStops}
-          </div>
-        </div>
-        <div>
-          <div class="text-sm text-gray-600">Remaining Distance</div>
-          <div class="font-medium">
-            {formatDistance(locationTracking.routeProgress.remainingDistance)}
-          </div>
+<!-- Route Progress -->
+{#if locationTracking.routeProgress}
+  <div class="mt-4 bg-white rounded-lg p-4 shadow">
+    <h3 class="font-semibold mb-2">Route Progress</h3>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <div class="text-sm text-gray-600">Completed Stops</div>
+        <div class="font-medium">
+          {locationTracking.routeProgress.completedStops} / {locationTracking.routeProgress.totalStops}
         </div>
       </div>
-      
-      {#if locationTracking.routeProgress.isDelayed}
-        <div class="mt-2 text-red-500 text-sm">
-          Route is delayed by {locationTracking.routeProgress.delayMinutes} minutes
+      <div>
+        <div class="text-sm text-gray-600">Remaining Distance</div>
+        <div class="font-medium">
+          {formatDistance(locationTracking.routeProgress.remainingDistance)}
         </div>
-      {/if}
+      </div>
     </div>
-  {/if}
+    
+    {#if locationTracking.routeProgress.isDelayed}
+      <div class="mt-2 text-red-500 text-sm">
+        Route is delayed by {locationTracking.routeProgress.delayMinutes} minutes
+      </div>
+    {/if}
+  </div>
+{/if}
 
-  <!-- Next Stop Preview -->
-  {#if locationTracking.lastLocationUpdate?.updatedStops[0]}
-    <div class="bg-blue-50 p-4 rounded-lg">
-      <h3 class="font-semibold mb-2">Next Stop</h3>
-      <div class="text-sm">
-        <div>ETA: { locationTracking.routeProgress?.nextStopEta ? formatDateTime(locationTracking.routeProgress?.nextStopEta?.toISOString()) : 'N/A'}</div>
-        <div>Type: {locationTracking.lastLocationUpdate.updatedStops[0].stopType}</div>
-        {#if locationTracking.lastLocationUpdate.updatedStops[0].shipment}
-          <div>Shipment: #{locationTracking.lastLocationUpdate.updatedStops[0].shipment.id}</div>
-        {/if}
-      </div>
-    </div>
-  {/if}
-</div>

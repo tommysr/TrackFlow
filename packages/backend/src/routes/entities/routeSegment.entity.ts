@@ -3,6 +3,7 @@ import { Column } from "typeorm";
 import { Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { Route } from "./route.entity";
 import { RouteStop } from "./routeStop.entity";
+import { Transform } from "class-transformer";
 
 
 // i could need it, but i dont think i need it
@@ -29,20 +30,9 @@ export class RouteSegment {
   path: object;
 
   @Column('decimal', { precision: 10, scale: 2 })
+  @Transform(({ value }) => Number(value))
   distance: number; // kilometers
 
   @Column('decimal', { precision: 10, scale: 2 })
-  duration: number; // in minutes (or seconds if you prefer)
-
-  @Column('timestamp', { nullable: true })
-  estimatedStartTime?: Date;
-
-  @Column('timestamp', { nullable: true })
-  estimatedEndTime?: Date;
-
-  @Column('timestamp', { nullable: true })
-  actualStartTime?: Date;
-
-  @Column('timestamp', { nullable: true })
-  actualEndTime?: Date;
+  duration: number; // in minutes
 }
