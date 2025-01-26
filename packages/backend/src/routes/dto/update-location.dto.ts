@@ -4,6 +4,5 @@ import { LocationDto } from 'src/common/dto/location.dto';
 
 export class UpdateLocationDto extends LocationDto {
   @IsDateString()
-  @Type(() => Date)
-  timestamp: string;
+  timestamp: Date;
 } 
