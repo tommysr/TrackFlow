@@ -24,6 +24,8 @@ export interface PostGISPoint {
   coordinates: [number, number]; // [longitude, latitude]
 }
 
+const NEARBY_THRESHOLD = 0.2; // 200 meters threshold
+
 @Injectable()
 export class RouteTrackingService {
   constructor(
@@ -48,6 +50,7 @@ export class RouteTrackingService {
   ): Promise<{
     updatedRoute: Route;
     updatedStops: RouteStop[];
+    updatedShipments: Shipment[];
     delays: RouteDelay[];
   }> {
     const route = await this.routeRepo.findOne({
@@ -58,106 +61,70 @@ export class RouteTrackingService {
       relations: ['stops', 'stops.shipment', 'metrics'],
     });
 
-    console.log('route being updated', route.stops.length);
-
     if (!route) throw new NotFoundException('No active route found');
+    console.log('route being updated', route.stops.length);
 
     // Update current location
     route.lastLocation = LocationDto.toGeoJSON(location.lng, location.lat);
     route.lastLocationUpdate = new Date(location.timestamp);
 
-    // Check for nearby stops and update statuses
-    const { updatedStops: nearbyStops, updatedShipments } =
-      await this.checkAndUpdateStops(route, location);
-
-    // Update ETAs and track delays
-    const { updatedStops, delays } = await this.etaService.updateETAs(
+    // Check for nearby stops and update statuses, progress the route
+    const { updatedStops, updatedShipments } = await this.checkAndUpdateRoute(
       route,
       location,
     );
 
-    // Update route metrics and path
-    const routeUpdate = await this.routingService.calculateRouteUpdate(
+    // Update ETAs and track delays, returns the updated stops with new ETAs (not saved to db, just in memory)
+    const {
+      remainingDistance,
+      remainingDuration,
+      routeGeometry,
+      segments,
+      updatedStops: stopsWithNewETAs,
+    } = await this.etaService.updateETAs(route, location);
+
+    const delays = await this.etaService.updateDelays(
+      stopsWithNewETAs,
+      route,
       location,
-      route.stops,
     );
 
     // Update the route path with the new calculated path
-    if (routeUpdate.segments.length > 0) {
-      const coordinates = routeUpdate.segments.reduce((acc, segment) => {
-        return acc.concat(segment.path.coordinates);
-      }, []);
-
-      route.fullPath = {
-        type: 'LineString',
-        coordinates: coordinates,
-      };
+    if (segments.length > 0) {
+      route.fullPath = routeGeometry;
     }
 
     // Calculate actual metrics
-    const completedStops = route.stops.filter((s) => s.actualArrival).length;
-    const totalStops = route.stops.length;
-    const completedStopsWithTimes = route.stops
-      .filter((s) => s.actualArrival && s.estimatedArrival)
-      .map((stop) => ({
-        actual: new Date(stop.actualArrival).getTime(),
-        estimated: new Date(stop.estimatedArrival).getTime(),
-      }));
-
-    // Calculate actual total time and deviation
-    let actualTotalTime = 0;
-    let totalDeviation = 0;
-    if (completedStopsWithTimes.length > 0) {
-      const firstStop = completedStopsWithTimes[0];
-      const lastStop =
-        completedStopsWithTimes[completedStopsWithTimes.length - 1];
-      actualTotalTime = (lastStop.actual - firstStop.actual) / (1000 * 60); // Convert to minutes
-
-      completedStopsWithTimes.forEach((stop) => {
-        const deviation = (stop.actual - stop.estimated) / (1000 * 60); // Convert to minutes
-        totalDeviation += deviation;
-      });
-    }
-
+    const totalStops = route.stops.filter((s) => s.stopType !== StopType.END && s.stopType !== StopType.START);
+    const totalStopsCount = totalStops.length;
+    const completedStopsCount = totalStops.filter((s) => s.actualArrival).length;
+ 
     if (!route.metrics) {
-      route.metrics = await this.routeMetricsRepo.save({
-        route,
-        completedStops,
-        totalStops,
-        completedDistance: route.totalDistance - routeUpdate.remainingDistance,
-        remainingDistance: routeUpdate.remainingDistance,
-        isDelayed: delays.length > 0,
-        delayMinutes: delays.length > 0 ? delays[0].delayMinutes : null,
-        actualTotalTime: actualTotalTime > 0 ? actualTotalTime : null,
-        deviationFromOptimal: totalDeviation !== 0 ? totalDeviation : null,
-      });
-    } else {
-      route.metrics.completedStops = completedStops;
-      route.metrics.totalStops = totalStops;
-      route.metrics.completedDistance =
-        route.totalDistance - routeUpdate.remainingDistance;
-      route.metrics.remainingDistance = routeUpdate.remainingDistance;
-      route.metrics.isDelayed = delays.length > 0;
-      route.metrics.delayMinutes =
-        delays.length > 0 ? delays[0].delayMinutes : null;
-      route.metrics.actualTotalTime =
-        actualTotalTime > 0 ? actualTotalTime : null;
-      route.metrics.deviationFromOptimal =
-        totalDeviation !== 0 ? totalDeviation : null;
-
-      route.metrics = await this.routeMetricsRepo.save(route.metrics);
+      throw new Error('Route metrics not found');
     }
+
+    route.metrics.completedStops = completedStopsCount;
+    route.metrics.totalStops = totalStopsCount;
+    route.metrics.completedDistance = route.totalDistance - remainingDistance;
+    route.metrics.remainingDistance = remainingDistance;
+    route.metrics.isDelayed = delays.length > 0;
+    route.metrics.delayMinutes =
+      delays.length > 0 ? delays[0].delayMinutes : null;
+
+    route.metrics = await this.routeMetricsRepo.save(route.metrics);
 
     const updatedRoute = await this.routeRepo.save(route);
 
     return {
       updatedRoute,
       updatedStops,
+      updatedShipments,
       delays,
     };
   }
 
-  private async checkAndUpdateStops(
+  // TODO: refactor this to be more readable
+  private async checkAndUpdateRoute(
     route: Route,
     currentLocation: LocationDto,
   ): Promise<{
@@ -172,8 +139,6 @@ export class RouteTrackingService {
       .filter((stop) => !stop.actualArrival)
       .sort((a, b) => a.sequenceIndex - b.sequenceIndex);
 
-    console.log('uncompletedStops', uncompletedStops.length);
-
     if (uncompletedStops.length === 0) {
       // All stops completed, complete the route
       route.status = RouteStatus.COMPLETED;
@@ -187,7 +152,6 @@ export class RouteTrackingService {
 
     // If it's a START stop and route is active, mark it as completed immediately
     if (currentStop.stopType === StopType.START) {
-      console.log('starting route');
       currentStop.actualArrival = new Date();
       const updatedStop = await this.routeStopRepository.save(currentStop);
       updatedStops.push(updatedStop);
@@ -195,18 +159,25 @@ export class RouteTrackingService {
       currentStop.stopType === StopType.PICKUP ||
       currentStop.stopType === StopType.DELIVERY
     ) {
-      console.log('checking if near stop', currentStop.stopType);
       if (await this.isNearStop(currentLocation, currentStop)) {
-        console.log('near stop');
         currentStop.actualArrival = new Date();
         const updatedStop = await this.routeStopRepository.save(currentStop);
         updatedStops.push(updatedStop);
+
+        const hasBothStopsInRoute =
+          currentStop.stopType === StopType.PICKUP &&
+          uncompletedStops.find(
+            (stop) =>
+              stop.stopType === StopType.DELIVERY &&
+              stop.shipmentId === currentStop.shipmentId,
+          ) !== undefined;
 
         // Update shipment status
         if (currentStop.shipment) {
           const newStatus = this.getNextShipmentStatus(
             currentStop.shipment.status,
             currentStop.stopType,
+            hasBothStopsInRoute,
           );
           if (newStatus !== currentStop.shipment.status) {
             currentStop.shipment.status = newStatus;
@@ -228,6 +199,7 @@ export class RouteTrackingService {
                 : ShipmentOperationType.DELIVERY,
           },
         });
+
         if (history) {
           history.completedAt = new Date();
           history.isSuccessful = true;
@@ -267,29 +239,29 @@ export class RouteTrackingService {
         lat: stopLocation[1], // PostGIS stores as [lng, lat]
         lng: stopLocation[0],
       },
-      0.2, // 200 meters threshold
+      NEARBY_THRESHOLD, // 200 meters threshold
     );
   }
 
   private getNextShipmentStatus(
     currentStatus: ShipmentStatus,
     stopType: StopType,
+    hasBothStopsInRoute: boolean,
   ): ShipmentStatus {
     if (
       stopType === StopType.PICKUP &&
       currentStatus === ShipmentStatus.ROUTE_SET
     ) {
-      return ShipmentStatus.PICKED_UP;
+      if (hasBothStopsInRoute) {
+        return ShipmentStatus.IN_DELIVERY;
+      } else {
+        return ShipmentStatus.PICKED_UP;
+      }
     } else if (
       stopType === StopType.DELIVERY &&
       currentStatus === ShipmentStatus.PICKED_UP
     ) {
-      return ShipmentStatus.IN_TRANSIT;
-    } else if (
-      stopType === StopType.DELIVERY &&
-      currentStatus === ShipmentStatus.IN_TRANSIT
-    ) {
-      return ShipmentStatus.DELIVERED;
+      return ShipmentStatus.IN_DELIVERY;
     }
 
     return currentStatus;

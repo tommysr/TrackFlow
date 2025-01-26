@@ -2,10 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RouteDelay } from 'src/routes/entities/route-delay.entity';
 import { Repository } from 'typeorm';
-import { RoutingService } from './routing.service';
+import {
+  RouteSegmentUpdate,
+  RouteUpdateResult,
+  RoutingService,
+  StopUpdate,
+} from './routing.service';
 import { Route } from 'src/routes/entities/route.entity';
 import { LocationDto } from 'src/common/dto/location.dto';
 import { RouteStop } from 'src/routes/entities/routeStop.entity';
+import { RouteSegment } from 'src/routes/entities/routeSegment.entity';
 
 @Injectable()
 export class ETAService {
@@ -15,23 +21,15 @@ export class ETAService {
     private readonly routingService: RoutingService,
   ) {}
 
-  async updateETAs(
+  async updateDelays(
+    updatedStops: StopUpdate[],
     route: Route,
     currentLocation: LocationDto,
-  ): Promise<{
-    updatedStops: RouteStop[];
-    delays: RouteDelay[];
-  }> {
-    const routeUpdate = await this.routingService.calculateRouteUpdate(
-      currentLocation,
-      route.stops,
-    );
-
+  ): Promise<RouteDelay[]> {
     const delays: RouteDelay[] = [];
 
-    // Update stops and check for delays
-    const updatedStops = await Promise.all(
-      routeUpdate.updatedStops.map(async (update) => {
+    await Promise.all(
+      updatedStops.map(async (update) => {
         const stop = route.stops.find((s) => s.id === update.id);
         const originalEta = stop.estimatedArrival;
         const newEta = update.estimatedArrival;
@@ -59,6 +57,18 @@ export class ETAService {
       }),
     );
 
-    return { updatedStops, delays };
+    return delays;
+  }
+
+  async updateETAs(
+    route: Route,
+    currentLocation: LocationDto,
+  ): Promise<RouteUpdateResult> {
+    const routeUpdate = await this.routingService.calculateRouteUpdate(
+      currentLocation,
+      route.stops,
+    );
+
+    return routeUpdate;
   }
 }
