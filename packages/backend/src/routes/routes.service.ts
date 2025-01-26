@@ -29,6 +29,7 @@ import {
   ShipmentOperationType,
   ShipmentRouteHistory,
 } from './entities/shipment-route-history.entity';
+import { RouteWithActivationDto } from './dto/route-with-activation.dto';
 
 interface StopTimeWindow {
   stopType: StopType;
@@ -62,7 +63,12 @@ export class RoutesService {
     createRouteDto: CreateRouteDto,
     user: IcpUser,
   ): Promise<Route> {
+    console.log(
+      'type of createRouteDto',
+      typeof createRouteDto.estimatedStartTime,
+    );
     // 1. Validate shipments and carrier
+    // throw new Error('test');
     const [shipments, carrier] = await Promise.all([
       this.validateShipmentsStatusAndOwnership(createRouteDto, user.principal),
       this.carrierRepo.findOne({
@@ -71,17 +77,18 @@ export class RoutesService {
       }),
     ]);
 
-    this.validateWindowsSet(shipments);
-
     if (!carrier) {
       throw new BadRequestException('Carrier not found');
     }
+
+    this.validateWindowsSet(shipments);
 
     // 2. Validate shipments and optimize route
     const { locations } = this.collectLocationsWithTypes(
       createRouteDto,
       shipments,
     );
+
     const {
       optimizedPoints,
       totalDistance,
@@ -99,14 +106,15 @@ export class RoutesService {
       totalTime,
     );
 
+    // TODO: do this after creating steps
     // 4. Validate time windows before route creation
     const preliminaryStops = optimizedPoints.map((point, index) => ({
       stopType: point.type,
       sequenceIndex: index,
       shipmentId: point.shipmentId,
       estimatedArrival: this.calculateStopEstimatedTime(
-        createRouteDto.estimatedStartTime,
-        matrix.durations,
+        new Date(createRouteDto.estimatedStartTime),
+        segments,
         index,
       ),
     }));
@@ -125,7 +133,7 @@ export class RoutesService {
       totalFuelCost,
       fuelConsumption,
       estimatedTime: totalTime,
-      date: createRouteDto.estimatedStartTime,
+      date: new Date(createRouteDto.estimatedStartTime),
       status: RouteStatus.PENDING,
       stops: [],
       fullPath: geometry
@@ -172,8 +180,8 @@ export class RoutesService {
     const routeStops = await Promise.all(
       optimizedPoints.map(async (point, index) => {
         const estimatedTime = this.calculateStopEstimatedTime(
-          savedRoute.date,
-          savedRoute.distanceMatrix.durations,
+          new Date(savedRoute.date),
+          segments,
           index,
         );
 
@@ -314,7 +322,7 @@ export class RoutesService {
         (s) => s.canisterShipmentId.toString() === shipmentOp.id,
       );
 
-      if (!shipment) return;
+      if (!shipment) throw new BadRequestException('Shipment not found');
 
       if (
         shipmentOp.type === RouteOperationType.BOTH ||
@@ -355,20 +363,31 @@ export class RoutesService {
 
   private calculateStopEstimatedTime(
     startTime: Date,
-    durations: number[][],
+    segments: { duration: number }[],
     stopIndex: number,
   ): Date {
-    const LOADING_TIME = 15 * 60; // 15 minutes in seconds
+    const LOADING_TIME = 5 * 60; // 5 minutes
     const startTimeMs = new Date(startTime).getTime();
 
+    console.log('start time', startTime);
     if (stopIndex === 0) return new Date(startTimeMs);
 
-    let cumulativeDuration = 0;
+    let cumulativeTime = 0;
+    // Add up durations of all segments up to this stop
     for (let i = 0; i < stopIndex; i++) {
-      cumulativeDuration += durations[i][i + 1] + LOADING_TIME;
+      cumulativeTime += Number(segments[i].duration); // Segment duration in seconds
+      cumulativeTime += LOADING_TIME; // Loading time at each stop
     }
 
-    return new Date(startTimeMs + cumulativeDuration * 1000);
+    console.log(
+      'adding cumulativeTime seconds (',
+      cumulativeTime,
+      ') to start time',
+      startTime.toUTCString(),
+    );
+    const newTime = new Date(startTimeMs + cumulativeTime * 1000);
+    console.log('new time', newTime.toUTCString());
+    return newTime;
   }
 
   private validateWindowsSet(shipments: Shipment[]) {
@@ -410,11 +429,14 @@ export class RoutesService {
       createRouteDto,
       shipments,
     );
-    const optimizationResult =
-      await this.routeOptimizationService.optimizeRoute(locations);
-
-    // Create optimized points array with sequence information
-    const { optimizedPoints } = optimizationResult;
+    const {
+      optimizedPoints,
+      segments,
+      totalTime,
+      totalDistance,
+      geometry,
+      matrix,
+    } = await this.routeOptimizationService.optimizeRoute(locations);
 
     // Map optimized points back to stops
     const stops = optimizedPoints.map((point, index) => {
@@ -427,13 +449,10 @@ export class RoutesService {
           }),
         stopType: point.type,
         sequenceIndex: index,
-        location: {
-          lng: point.lng,
-          lat: point.lat,
-        },
+        location: point,
         estimatedArrival: this.calculateStopEstimatedTime(
-          createRouteDto.estimatedStartTime,
-          optimizationResult.matrix?.durations || [],
+          new Date(createRouteDto.estimatedStartTime),
+          segments,
           index,
         ),
       };
@@ -443,39 +462,71 @@ export class RoutesService {
 
     return {
       shipments: shipments.map((shipment) => ({
-        pickupAddress: {
-          lat: shipment.pickupAddress.lat,
-          lng: shipment.pickupAddress.lng,
-        },
-        deliveryAddress: {
-          lat: shipment.deliveryAddress.lat,
-          lng: shipment.deliveryAddress.lng,
-        },
+        pickupAddress: shipment.pickupAddress,
+        deliveryAddress: shipment.deliveryAddress,
       })),
       stops,
-      totalDistance: optimizationResult.totalDistance,
+      totalDistance,
       totalFuelCost:
-        (optimizationResult.totalDistance /
-          carrier.configuration.fuelEfficiency) *
+        (totalDistance / carrier.configuration.fuelEfficiency) *
         carrier.configuration.fuelCostPerLiter,
-      estimatedTime: optimizationResult.totalTime,
-      fullPath: optimizationResult.geometry
-        ? {
-            type: 'LineString' as const,
-            coordinates: optimizationResult.geometry.coordinates,
-          }
-        : undefined,
-      distanceMatrix: optimizationResult.matrix,
+      estimatedTime: totalTime,
+      fullPath: geometry,
+      distanceMatrix: matrix,
     };
   }
 
   // Find all routes for a user
-  async findAllByUser(user: IcpUser): Promise<Route[]> {
-    return this.routeRepo.find({
+  async findAllByUser(user: IcpUser): Promise<RouteWithActivationDto[]> {
+    const routes = await this.routeRepo.find({
       where: { carrier: { principal: user.principal } },
       relations: ['carrier', 'stops', 'stops.shipment', 'metrics'],
       order: { date: 'DESC' },
     });
+
+    // Calculate latest activation time for pending routes
+    return routes.map((route) => {
+      const latestActivationTime = this.calculateLatestActivationTime(route);
+      return {
+        route,
+        latestActivationTime,
+      };
+    });
+  }
+
+  private calculateLatestActivationTime(route: Route): Date | null {
+    if (!route.stops?.length) return null;
+
+    const stopsWithWindows = route.stops
+      .filter((stop) => stop.shipment)
+      .map((stop) => {
+        // Calculate cumulative duration to this stop using actual stop ETAs
+        const durationToStop =
+          (new Date(stop.estimatedArrival).getTime() -
+            new Date(route.date).getTime()) /
+          1000;
+
+        return {
+          stop,
+          durationToStop, // Duration in seconds from route start to this stop
+          windowEnd:
+            stop.stopType === StopType.PICKUP
+              ? stop.shipment.pickupWindowEnd
+              : stop.shipment.deliveryWindowEnd,
+        };
+      });
+
+    if (!stopsWithWindows.length) return null;
+
+    // Find the most constraining time window
+    const latestPossibleStart = Math.min(
+      ...stopsWithWindows.map(
+        ({ windowEnd, durationToStop }) =>
+          new Date(windowEnd).getTime() - durationToStop * 1000,
+      ),
+    );
+
+    return new Date(latestPossibleStart);
   }
 
   // Find specific route for a user
@@ -578,6 +629,8 @@ export class RoutesService {
       relations: ['stops', 'stops.shipment'],
     });
 
+    // TODO: search shipments route history for overlapping shipments
+
     // Validate shipment availability
     const overlappingShipments = existingRoutes
       .flatMap((route) => route.stops)
@@ -591,7 +644,7 @@ export class RoutesService {
         canisterShipmentId: In(shipments.map((s) => s.canisterShipmentId)),
         status: In([
           ShipmentStatus.PICKED_UP, // Only consider shipments that are physically being handled
-          ShipmentStatus.IN_TRANSIT, // Or are already in transit
+          ShipmentStatus.IN_DELIVERY, // Or are already in transit
         ]),
       },
     });
@@ -661,11 +714,12 @@ export class RoutesService {
   }
 
   async recalculateRouteTimes(route: Route, currentTime: Date) {
+    console.log('recalculating route times', route.segments);
     route.stops = route.stops.map((stop, index) => ({
       ...stop,
       estimatedArrival: this.calculateStopEstimatedTime(
         currentTime,
-        route.distanceMatrix.durations,
+        route.segments,
         index,
       ),
     }));
@@ -702,7 +756,7 @@ export class RoutesService {
   async activateRoute(routeId: string, userPrincipal: string): Promise<Route> {
     const route = await this.routeRepo.findOne({
       where: { id: routeId, carrier: { principal: userPrincipal } },
-      relations: ['stops', 'stops.shipment'],
+      relations: ['stops', 'stops.shipment', 'segments'],
     });
 
     if (!route) {
@@ -721,6 +775,7 @@ export class RoutesService {
         carrier: { principal: userPrincipal },
         status: RouteStatus.ACTIVE,
       },
+      relations: ['stops', 'stops.shipment', 'segments'],
     });
 
     if (activeRoute) {
@@ -729,14 +784,14 @@ export class RoutesService {
 
     const currentTime = new Date();
 
-    // Update route times
-    route.status = RouteStatus.ACTIVE;
-    route.startedAt = currentTime;
-    route.date = currentTime;
-
+    // Recalculate all ETAs based on current time
     const updatedRoute = await this.recalculateRouteTimes(route, currentTime);
-
     await this.validateRouteStops(updatedRoute);
+
+    // Update route status and times
+    updatedRoute.status = RouteStatus.ACTIVE;
+    updatedRoute.startedAt = currentTime;
+    updatedRoute.date = currentTime;
 
     return this.routeRepo.save(updatedRoute);
   }

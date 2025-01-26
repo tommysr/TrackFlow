@@ -54,7 +54,8 @@ export class RouteOptimizationService {
       const route = await this.getDetailedRoute(orderedLocations);
       console.log('route', route);
       const segments = this.extractSegments(route.data);
-      
+      console.log('segments cos tam', segments.map(segment => segment.duration));
+
       return {
         optimizedPoints: orderedLocations,
         totalDistance: route.data.features[0].properties.summary.distance / 1000,
