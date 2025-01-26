@@ -181,4 +181,24 @@ export class RoutesController {
   // ): Promise<RouteDelay[]> {
   //   return this.routesService.getDelayHistory(routeId, query);
   // }
+
+  @Post('check-delivery')
+  @ApiOperation({ summary: 'Check delivery status and update route data' })
+  @UseGuards(ShipmentSyncGuard) // First sync ICP events
+  async checkAndUpdateDelivery(
+    @Body() data: { shipmentId: string },
+  ): Promise<{
+    updatedStop?: RouteStop;
+    updatedShipment?: Shipment;
+    wasUpdated: boolean;
+  }> {
+    const result = await this.routeTrackingService.checkAndUpdateDeliveryStop(
+      data.shipmentId,
+    );
+
+    return {
+      ...result,
+      wasUpdated: !!result,
+    };
+  }
 }
