@@ -84,6 +84,8 @@
     }
   });
 
+  const PL_ZIP_PATTERN = '[0-9]{2}-[0-9]{3}';
+
   let source = $state({
     street: '',
     city: '',
@@ -340,7 +342,7 @@
                 id="source-zip"
                 bind:value={source.zip}
                 required
-                pattern="[0-9]*"
+                pattern={PL_ZIP_PATTERN}
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="ZIP"
               />
@@ -384,7 +386,7 @@
                   id="dest-zip"
                   bind:value={destination.zip}
                   required
-                  pattern="[0-9]*"
+                  pattern={PL_ZIP_PATTERN}
                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="ZIP"
                 />
