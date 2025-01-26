@@ -17,6 +17,7 @@ import { RouteOptimizationService } from './route-optimization.service';
 import { RouteMetrics } from './entities/route-metrics.entity';
 import { RouteDistanceMatrix } from './entities/route-distance-matrix.entity';
 import { ShipmentRouteHistory } from './entities/shipment-route-history.entity';
+import { Carrier } from 'src/carriers/entities/carrier.entity';
 
 export * from './types/location.types';
 export * from './types/openroute.types';
@@ -27,7 +28,8 @@ export * from './types/openroute.types';
       Route, 
       RouteStop, 
       RouteSegment, 
-      Shipment, 
+      Shipment,
+      Carrier, 
       RouteMetrics,
       RouteDistanceMatrix,
       ShipmentRouteHistory,
