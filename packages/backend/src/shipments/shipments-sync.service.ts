@@ -15,6 +15,7 @@ import { Shipper } from '../auth/entities/shipper.entity';
 import { Principal } from '@dfinity/principal';
 import { Address } from './entities/address.entity';
 import { ShipmentSequence } from './entities/shipment-sequence.entity';
+import { NotificationService } from '../core/services/notification.service';
 
 const host = `http://localhost:4943`;
 
@@ -59,6 +60,7 @@ export class ShipmentsSyncService {
     private readonly shipperRepository: Repository<Shipper>,
     @InjectRepository(ShipmentSequence)
     private readonly sequenceRepository: Repository<ShipmentSequence>,
+    private readonly notificationService: NotificationService,
   ) {}
 
   private async getLastProcessedSequence(): Promise<bigint> {
@@ -147,6 +149,7 @@ export class ShipmentsSyncService {
       where: {
         canisterShipmentId: event.CarrierAssigned.shipment_id.toString(),
       },
+      relations: ['shipper', 'shipper.user', 'carrier', 'carrier.user'],
     });
 
     if (!shipment) {
@@ -155,8 +158,18 @@ export class ShipmentsSyncService {
     }
 
     await this.handleBoughtUpdate(shipment, event.CarrierAssigned.carrier);
-
     await this.shipmentRepository.save(shipment);
+
+
+    await this.notificationService.sendShipmentNotification({
+      to: shipment.shipper.user.contact,
+      subject: 'Your Shipment is Now Active',
+      text: `Your shipment (ID: ${shipment.id}) has been bought by carrier ${shipment.carrier?.user?.name || 'Unknown'}. They will handle the delivery of your package.`,
+      html: `<h1>Your Shipment is Now Active</h1>
+            <p>Your shipment (ID: ${shipment.id}) has been bought by carrier ${shipment.carrier?.user?.name || 'Unknown'}. They will handle the delivery of your package.</p>
+            <p><strong>Carrier:</strong> ${shipment.carrier?.user?.name || 'Unknown'}</p>`,
+    });
+
   }
 
   private async handleShipmentCreated(event: {
@@ -313,6 +326,7 @@ export class ShipmentsSyncService {
       where: {
         canisterShipmentId: event.Finalized.shipment_id.toString(),
       },
+      relations: ['shipper', 'shipper.user'],
     });
 
     if (!shipment) {
@@ -323,6 +337,15 @@ export class ShipmentsSyncService {
     // Update shipment status to DELIVERED
     shipment.status = ShipmentStatus.DELIVERED;
     await this.shipmentRepository.save(shipment);
+    
+    // Send delivery notification
+    await this.notificationService.sendShipmentNotification({
+      to: shipment.shipper.user.contact,
+      subject: 'Your Shipment is Now Delivered',
+      text: `Your shipment (ID: ${shipment.id}) has been successfully delivered!`,
+      html: `<h1>Your Shipment is Now Delivered</h1>
+            <p>Your shipment (ID: ${shipment.id}) has been successfully delivered!</p>`,
+    });
     
     this.logger.debug(
       `Updated shipment ${shipment.canisterShipmentId} status to DELIVERED`,

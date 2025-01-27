@@ -2,7 +2,8 @@
   "name": "zttai-monorepo",
   "workspaces": [
     "packages/backend",
-    "packages/frontend"
+    "packages/frontend",
+    "packages/mailer"
   ],
   "engines": {
     "node": ">=16.0.0",

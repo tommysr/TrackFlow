@@ -59,7 +59,7 @@
   ];
 
   function copyTrackingLink(shipment: PendingShipment | BoughtShipment) {
-    const trackingLink = `${window.location.origin}/map/track/${shipment.trackingToken || ''}`;
+    const trackingLink = `${window.location.origin}/map/track?token=${shipment.trackingToken || ''}`;
     navigator.clipboard.writeText(trackingLink);
   }
 

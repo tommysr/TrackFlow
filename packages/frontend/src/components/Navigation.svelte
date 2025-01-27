@@ -2,13 +2,11 @@
   import { page } from '$app/stores';
   import clsx from 'clsx';
   import HomeIcon from './HomeIcon.svelte';
-  import { Box, TruckIcon } from 'lucide-svelte';
-  import SendIcon from './SendIcon.svelte';
+  import { Box, TruckIcon, Settings, Send } from 'lucide-svelte';
   import { wallet } from '$src/lib/wallet.svelte';
   import Button from './Button.svelte';
   import { locationTracking } from '$src/lib/stores/locationTracking.svelte';
 
-  let apiConnected = $state(false);
   let currentPage = $derived($page.url.pathname);
   let isNavbarOpen = $state(false);
   let navigationItems = $derived([
@@ -17,7 +15,7 @@
     { label: 'Drivers', href: '/map/drivers', Component: TruckIcon },
     { 
       label: 'Track', 
-      Component: SendIcon,
+      Component: Send,
       isToggle: true,
       onClick: () => {
         if (locationTracking.isTracking) {
@@ -27,6 +25,7 @@
         }
       }
     },
+    { label: 'Settings', href: '/settings', Component: Settings },
   ]);
 
   export async function fetchChallenge(): Promise<{ sessionId: string; challenge: string }> {
@@ -72,7 +71,6 @@
     if (response.ok) {
       const { accessToken } = await response.json();
       localStorage.setItem('api_token', accessToken);
-      apiConnected = true;
     } else {
       console.error('API connection failed');
     }

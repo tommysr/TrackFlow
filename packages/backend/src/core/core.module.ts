@@ -12,6 +12,7 @@ import { RouteMetrics } from 'src/routes/entities/route-metrics.entity';
 import { RoutingService } from './services/routing.service';
 import { ETAService } from './services/eta.service';
 import { RouteDelay } from 'src/routes/entities/route-delay.entity';
+import { NotificationService } from './services/notification.service';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { RouteDelay } from 'src/routes/entities/route-delay.entity';
     forwardRef(() => RoutesModule),
     CommonModule,
   ],
-  providers: [RouteTrackingService, RoutingService, ETAService],
-  exports: [RouteTrackingService],
+  providers: [RouteTrackingService, RoutingService, ETAService, NotificationService],
+  exports: [RouteTrackingService, NotificationService],
 })
 export class CoreModule {} 

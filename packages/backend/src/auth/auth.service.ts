@@ -6,6 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import { IcpPayload } from './strategies/icp-payload.interface';
 import { IcpUser, UserRole } from './entities/icp.user.entity';
 import { ConfigService } from '@nestjs/config';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -53,5 +54,23 @@ export class AuthService {
       console.error('Error validating ICP payload:', error);
       throw new UnauthorizedException('Invalid ICP authentication');
     }
+  }
+
+  async updateProfile(principal: string, updateProfileDto: UpdateProfileDto): Promise<IcpUser> {
+    const user = await this.icpUserRepository.findOne({ where: { principal } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    Object.assign(user, updateProfileDto);
+    return this.icpUserRepository.save(user);
+  }
+
+  async getProfile(principal: string): Promise<IcpUser> {
+    const user = await this.icpUserRepository.findOne({ where: { principal } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return user;
   }
 }
