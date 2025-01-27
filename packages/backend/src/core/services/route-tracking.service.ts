@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Route, RouteStatus } from 'src/routes/entities/route.entity';
 import { RouteStop } from 'src/routes/entities/routeStop.entity';
 import {
@@ -9,13 +9,21 @@ import {
 } from 'src/shipments/entities/shipment.entity';
 
 import { LocationService } from '../../common/services/location.service';
-import { RouteSegmentUpdate, RoutingService, StopUpdate } from './routing.service';
+import {
+  RouteSegmentUpdate,
+  RoutingService,
+  StopUpdate,
+} from './routing.service';
 import { ETAService } from './eta.service';
 import { RouteDelay } from 'src/routes/entities/route-delay.entity';
 import { RouteMetrics } from 'src/routes/entities/route-metrics.entity';
 import { ShipmentRouteHistory } from 'src/routes/entities/shipment-route-history.entity';
 import { ShipmentOperationType } from 'src/routes/entities/shipment-route-history.entity';
-import { GeoLineString, GeoPoint, StopType } from 'src/routes/types/location.types';
+import {
+  GeoLineString,
+  GeoPoint,
+  StopType,
+} from 'src/routes/types/location.types';
 import { UpdateLocationDto } from '../../routes/dto/update-location.dto';
 import { LocationDto } from 'src/common/dto/location.dto';
 
@@ -271,7 +279,10 @@ export class RouteTrackingService {
     return currentStatus;
   }
 
-  async checkAndUpdateDeliveryStop(shipmentId: string): Promise<{
+  async checkAndUpdateDeliveryStop(
+    routeId: string,
+    shipmentId: string,
+  ): Promise<{
     updatedStop: RouteStop;
     updatedShipment: Shipment;
   } | null> {
@@ -279,10 +290,7 @@ export class RouteTrackingService {
     const route = await this.routeRepo.findOne({
       where: {
         status: RouteStatus.ACTIVE,
-        stops: {
-          shipmentId,
-          stopType: StopType.DELIVERY,
-        },
+        id: routeId,
       },
       relations: ['stops', 'stops.shipment'],
     });
@@ -356,98 +364,99 @@ export class RouteTrackingService {
     route: Route,
     shipmentId: string,
     currentLocation: LocationDto,
-    showRouteThresholdKm: number = 5 // Show route when carrier is within 5km
+    showRouteThresholdKm: number = 5, // Show route when carrier is within 5km
   ): Promise<{
     segment?: GeoLineString;
-    remainingDistance: number;
-    remainingDuration: number;
     isPickupRoute: boolean;
     isNearby: boolean;
   } | null> {
     console.log('route', route, shipmentId);
     // Get shipment stops
     const shipmentStops = route.stops
-      .filter(stop => stop.shipment)
-      .filter(stop => stop.shipment.canisterShipmentId === shipmentId)
+      .filter((stop) => stop.shipment)
+      .filter((stop) => stop.shipment.canisterShipmentId === shipmentId)
       .sort((a, b) => a.sequenceIndex - b.sequenceIndex);
 
     console.log('shipmentStops', shipmentStops);
-  
-    const pickupStop = shipmentStops.find(s => s.stopType === StopType.PICKUP);
-    const deliveryStop = shipmentStops.find(s => s.stopType === StopType.DELIVERY);
-  
+
+    const pickupStop = shipmentStops.find(
+      (s) => s.stopType === StopType.PICKUP,
+    );
+    const deliveryStop = shipmentStops.find(
+      (s) => s.stopType === StopType.DELIVERY,
+    );
+
     if (!pickupStop || !deliveryStop) {
       return null;
     }
-  
+
     // Determine active phase
     const isPickupPhase = !pickupStop.actualArrival;
     const targetStop = isPickupPhase ? pickupStop : deliveryStop;
-  
+
     // Calculate straight-line distance to determine if carrier is nearby
     const targetLocation = targetStop.location as GeoPoint;
     const straightLineDistance = this.calculateDistance(
       currentLocation.lat,
       currentLocation.lng,
       targetLocation.coordinates[1],
-      targetLocation.coordinates[0]
+      targetLocation.coordinates[0],
     );
-  
+
     const isNearby = straightLineDistance <= showRouteThresholdKm;
-  
+
     // If not nearby, just return distance/duration without geometry
     if (!isNearby) {
       return {
-        remainingDistance: straightLineDistance,
-        remainingDuration: straightLineDistance * 2, // rough estimate
         isPickupRoute: isPickupPhase,
-        isNearby: false
+        isNearby: false,
       };
     }
-  
+
     // If nearby, calculate actual route
     const allRemainingStops = route.stops
-      .filter(stop => !stop.actualArrival)
+      .filter((stop) => !stop.actualArrival)
       .sort((a, b) => a.sequenceIndex - b.sequenceIndex);
-  
+
     const stopsUpToTarget = allRemainingStops
-      .filter(stop => stop.sequenceIndex <= targetStop.sequenceIndex)
-      .map(stop => ({
+      .filter((stop) => stop.sequenceIndex <= targetStop.sequenceIndex)
+      .map((stop) => ({
         ...stop,
-        shipmentId: stop.shipmentId === shipmentId ? stop.shipmentId : undefined
+        shipmentId:
+          stop.shipmentId === shipmentId ? stop.shipmentId : undefined,
       }));
-  
+
     const routeUpdate = await this.routingService.calculateRouteUpdate(
       currentLocation,
-      stopsUpToTarget
+      stopsUpToTarget,
     );
-  
+
     return {
       segment: routeUpdate.routeGeometry,
-      remainingDistance: routeUpdate.remainingDistance,
-      remainingDuration: routeUpdate.remainingDuration,
       isPickupRoute: isPickupPhase,
-      isNearby: true
+      isNearby: true,
     };
   }
-  
+
   private calculateDistance(
     lat1: number,
     lon1: number,
     lat2: number,
-    lon2: number
+    lon2: number,
   ): number {
     const R = 6371; // Earth's radius in km
     const dLat = this.toRad(lat2 - lat1);
     const dLon = this.toRad(lon2 - lon1);
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      Math.cos(this.toRad(lat1)) *
+        Math.cos(this.toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
-  
+
   private toRad(degrees: number): number {
     return degrees * (Math.PI / 180);
   }

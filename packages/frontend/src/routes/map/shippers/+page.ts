@@ -5,6 +5,7 @@ import type {
   BoughtShipment,
   BoughtShipmentResponse,
   InTransitShipment,
+  InTransitShipmentResponse,
   PendingShipment,
   PendingShipmentResponse,
 } from '$lib/extended.shipment';
@@ -63,78 +64,65 @@ export const load: PageLoad = async ({
       const backendBoughtShipments: Array<BoughtShipmentResponse> =
         await responseBought.json();
 
-      myBoughtShipments = icpCreatedShipments.map((shipment) => {
-        const backendData = backendBoughtShipments.find(
-          (bs) => bs.canisterShipmentId === shipment.id.toString(),
-        );
+      myBoughtShipments = icpCreatedShipments
+        .map((shipment) => {
+          const backendData = backendBoughtShipments.find(
+            (bs) => bs.canisterShipmentId === shipment.id.toString(),
+          );
 
-        console.log(backendData);
-        if (!backendData) {
-          return null;
-        }
+          console.log(backendData);
+          if (!backendData) {
+            return null;
+          }
 
-        return {
-          ...shipment,
-          status: backendData.status,
-          trackingToken: backendData.trackingToken,
-          pickup: backendData.pickup,
-          delivery: backendData.delivery,
-          assignedCarrier: backendData.assignedCarrier,
-          estimatedPickupDate: backendData.estimatedPickupDate,
-          estimatedDeliveryDate: backendData.estimatedDeliveryDate,
-        };
-      }).filter((shipment) => shipment !== null);
+          return {
+            ...shipment,
+            status: backendData.status,
+            trackingToken: backendData.trackingToken,
+            pickup: backendData.pickup,
+            delivery: backendData.delivery,
+            assignedCarrier: backendData.assignedCarrier,
+            estimatedPickupDate: backendData.estimatedPickupDate,
+            estimatedDeliveryDate: backendData.estimatedDeliveryDate,
+          };
+        })
+        .filter((shipment) => shipment !== null);
+    }
+
+    const responseInTransit = await authenticatedFetch(
+      'http://localhost:5000/shipments/my-in-route',
+    );
+
+    if (responseInTransit.ok) {
+      const backendInTransitShipments: Array<InTransitShipmentResponse> =
+        await responseInTransit.json();
+
+      myInTransitShipments = icpCreatedShipments
+        .map((shipment) => {
+          const backendData = backendInTransitShipments.find(
+            (bs) => bs.canisterShipmentId === shipment.id.toString(),
+          );
+
+          if (!backendData) {
+            return null;
+          }
+
+          return {
+            ...shipment,
+            status: backendData.status,
+            trackingToken: backendData.trackingToken,
+            pickup: backendData.pickup,
+            delivery: backendData.delivery,
+            assignedCarrier: backendData.assignedCarrier,
+            estimatedPickupDate: backendData.estimatedPickupDate,
+            estimatedDeliveryDate: backendData.estimatedDeliveryDate,
+            actualPickupDate: backendData.actualPickupDate,
+            actualDeliveryDate: backendData.actualDeliveryDate,
+          };
+        })
+        .filter((shipment) => shipment !== null);
     }
   }
-
-  console.log(myPendingShipments);
-
-  // Get additional data from backend for bought/transit shipments
-
-  // if (stateWallet.actor) {
-  //   const response = await authenticatedFetch(
-  //     'http://localhost:5000/shipments/my-shipments',
-  //   );
-  //   const backendShipments = await response.json();
-
-  //   // Merge ICP and backend data
-  //   data.created
-  //     .filter(
-  //       (shipment) =>
-  //         shipment.customer === stateWallet.identity?.getPrincipal(),
-  //     )
-  //     .forEach((shipment) => {
-  //       const backendData = backendShipments.find(
-  //         (bs: any) => bs.canisterShipmentId === shipment.id,
-  //       );
-
-  //       if (backendData) {
-  //         const today = new Date();
-  //         const pickupDate = new Date(backendData.pickupDate);
-  //         const deliveryDate = new Date(backendData.deliveryDate);
-
-  //         const extendedShipment: ExtendedShipment = {
-  //           ...shipment,
-  //           pickupDate,
-  //           deliveryDate,
-  //           lastUpdate: new Date(backendData.lastUpdate),
-  //           eta: backendData.eta,
-  //           currentLocation: backendData.currentLocation,
-  //           routeSegment: backendData.routeSegment,
-  //           trackingToken: backendData.trackingToken
-  //         };
-
-  //         if (
-  //           pickupDate.toDateString() === today.toDateString() ||
-  //           deliveryDate.toDateString() === today.toDateString()
-  //         ) {
-  //           inTransitShipments.push(extendedShipment);
-  //         } else {
-  //           boughtShipments.push(extendedShipment);
-  //         }
-  //       }
-  //     });
-  // }
 
   return {
     pendingShipments: myPendingShipments,

@@ -31,9 +31,9 @@ export class BoughtShipmentResponseDto extends PendingShipmentResponseDto {
   assignedCarrier: CarrierResponseDto;
 }
 
+export class CarriedShipmentResponseDto extends BoughtShipmentResponseDto {}
+
 export class InTransitShipmentResponseDto extends BoughtShipmentResponseDto {
-  currentLocation?: LocationDto;
-  lastUpdate?: Date;
-  eta?: number;
-  routeSegment?: RouteSegmentDto;
+  actualDeliveryDate?: Date;
+  actualPickupDate?: Date;
 }

@@ -147,7 +147,7 @@
               ? `${shipment.pickup.address.street}, ${shipment.pickup.address.city}`
               : !shipment.isPickupPhase && shipment.delivery
                 ? `${shipment.delivery.address.street}, ${shipment.delivery.address.city}`
-                : 'Not available'}
+                : 'address information not yet available'}
           </p>
         </div>
       </div>
@@ -202,23 +202,6 @@
           </div>
         {/if}
 
-        {#if shipment.remainingDistance}
-          <div class="flex justify-between">
-            <span class="text-sm text-gray-500">Remaining Distance</span>
-            <span class="font-medium"
-              >{shipment.remainingDistance.toFixed(1)} km</span
-            >
-          </div>
-        {/if}
-
-        {#if shipment.remainingDuration}
-          <div class="flex justify-between">
-            <span class="text-sm text-gray-500">Remaining Time</span>
-            <span class="font-medium"
-              >{Math.round(shipment.remainingDuration)} minutes</span
-            >
-          </div>
-        {/if}
       </div>
     </div>
   {:else}

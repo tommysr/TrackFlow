@@ -15,8 +15,8 @@ export class PublicShipmentTrackingDto {
   currentLocation?: LocationDto;
   lastUpdate?: Date;
   
-  remainingDistance: number;
-  remainingDuration: number;
+  // remainingDistance: number;
+  // remainingDuration: number;
   isPickupPhase: boolean;
   isNearby: boolean;
 

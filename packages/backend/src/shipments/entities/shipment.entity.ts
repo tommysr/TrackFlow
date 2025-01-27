@@ -28,7 +28,7 @@ export class Shipment {
   shipper: Shipper;
 
   @ManyToOne(() => Carrier, (carrier) => carrier.shipments, { nullable: true })
-  carrier: Carrier;
+  carrier?: Carrier;
 
   @Column({ type: 'enum', enum: ShipmentStatus, default: ShipmentStatus.PENDING })
   status: ShipmentStatus;
@@ -44,17 +44,11 @@ export class Shipment {
   @Column({ type: 'text' })
   size: string; 
 
-  @Column('text', { nullable: true })
-  hashedSecret: string; // from canister
-
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @Column('timestamptz', { nullable: true })
-  eta: Date;
 
   @OneToOne(() => Address, address => address.pickupForShipment, { 
     cascade: true,
@@ -72,11 +66,8 @@ export class Shipment {
   @JoinColumn()
   deliveryAddress?: Address;
 
-  @Column('jsonb', { nullable: true })
-  lastRouteSegment: { lat: number; lng: number }[];
-
   @Column({ nullable: true })
-  trackingToken: string;
+  trackingToken?: string;
 
   @Column('timestamptz', { nullable: true })
   pickupWindowStart?: Date;
@@ -91,5 +82,5 @@ export class Shipment {
   deliveryWindowEnd?: Date;
 
   @OneToMany(() => ShipmentRouteHistory, history => history.shipment)
-  routeHistory: ShipmentRouteHistory[];
+  routeHistory?: ShipmentRouteHistory[];
 } 

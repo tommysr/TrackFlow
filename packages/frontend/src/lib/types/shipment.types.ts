@@ -8,8 +8,6 @@ export interface PublicShipmentTrackingDto {
   estimatedDeliveryDate?: string;
   currentLocation?: LocationResponse;
   lastUpdate?: string;
-  remainingDistance: number;
-  remainingDuration: number;
   isPickupPhase: boolean;
   isNearby: boolean;
   activeSegment?: {

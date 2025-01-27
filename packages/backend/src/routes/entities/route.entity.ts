@@ -12,7 +12,7 @@ import {
 import { Carrier } from '../../carriers/entities/carrier.entity';
 import { RouteSegment } from './routeSegment.entity';
 import { RouteStop } from './routeStop.entity';
-import { Transform } from 'class-transformer';
+import { Transform, Exclude } from 'class-transformer';
 import { RouteMetrics } from './route-metrics.entity';
 import { RouteDistanceMatrix } from './route-distance-matrix.entity';
 import { ShipmentRouteHistory } from './shipment-route-history.entity';
@@ -30,6 +30,7 @@ export class Route {
   id: string;
 
   @ManyToOne(() => Carrier, (carrier) => carrier.routes)
+  @Transform(({ value }) => ({ principal: value?.principal }))
   carrier: Carrier;
 
   @Column('decimal', { precision: 10, scale: 2 })
@@ -91,7 +92,6 @@ export class Route {
   @OneToOne(() => RouteDistanceMatrix, matrix => matrix.route, { cascade: true, onDelete: 'CASCADE' })
   distanceMatrix: RouteDistanceMatrix;
 
-  // optional
   @OneToMany(() => RouteStop, stop => stop.route, { cascade: true, onDelete: 'CASCADE' })
   stops: RouteStop[];
 
