@@ -21,6 +21,10 @@ const configFactory = () => {
   );
   console.log('JWT_SECRET:', process.env.JWT_SECRET);
   console.log('JWT_EXPIRES_IN:', process.env.JWT_EXPIRES_IN);
+  console.log('SMTP_HOST:', process.env.SMTP_HOST);
+  console.log('SMTP_PORT:', process.env.SMTP_PORT);
+  console.log('SMTP_USER:', process.env.SMTP_USER);
+  console.log('SMTP_PASS:', process.env.SMTP_PASS);
 
   return {
     geocoding: {
