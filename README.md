@@ -1,7 +1,15 @@
-# Logistics Management System
+# Peer-to-Peer Shipping Platform
 
 ## Overview
-A comprehensive logistics management system built with NestJS and SvelteKit, providing robust APIs for managing shipments, carriers, routes, and real-time tracking. The system features advanced route optimization, real-time GPS tracking, automated notifications, and integration with Internet Computer (IC) for decentralized authentication and data storage.
+A decentralized shipping platform that connects individual shippers with independent carriers. The platform enables anyone to ship items by creating shipments and allows independent carriers to bid on and fulfill these deliveries. Built with NestJS and SvelteKit, it features real-time tracking, secure payments through Internet Computer (IC), and a trust system based on carrier deposits.
+
+Key aspects:
+- Individuals can create and pay for shipments
+- Independent carriers can earn by delivering packages
+- Deposit-based trust system for carriers
+- Real-time tracking for all parties
+- Decentralized payment and authentication
+- Route optimization for efficient deliveries
 
 ## Architecture
 
