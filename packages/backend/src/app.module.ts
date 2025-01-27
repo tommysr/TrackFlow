@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { ShipmentsModule } from './shipments/shipments.module';
 import { CarriersModule } from './carriers/carriers.module';
 import { RoutesModule } from './routes/routes.module';
+import { NotificationService } from './core/services/notification.service';
 
 const configFactory = () => {
   console.log('Environment variables:');
@@ -14,7 +15,10 @@ const configFactory = () => {
   console.log('DATABASE_PORT:', process.env.DATABASE_PORT);
   console.log('DATABASE_USER:', process.env.DATABASE_USER);
   console.log('NODE_ENV:', process.env.NODE_ENV);
-  console.log('ENV_FILE:', process.env.NODE_ENV == 'test' ? '.env.test' : '.env');
+  console.log(
+    'ENV_FILE:',
+    process.env.NODE_ENV == 'test' ? '.env.test' : '.env',
+  );
   console.log('JWT_SECRET:', process.env.JWT_SECRET);
   console.log('JWT_EXPIRES_IN:', process.env.JWT_EXPIRES_IN);
 
@@ -39,6 +43,9 @@ const configFactory = () => {
       secret: process.env.JWT_SECRET,
       expiresIn: process.env.JWT_EXPIRES_IN,
     },
+    rabbitmq: {
+      url: process.env.RABBITMQ_URL || 'amqp://localhost',
+    },
   };
 };
 
@@ -58,7 +65,10 @@ const configFactory = () => {
         console.log('ConfigService values:');
         console.log('database.host:', configService.get('database.host'));
         console.log('database.port:', configService.get('database.port'));
-        console.log('database.username:', configService.get('database.username'));
+        console.log(
+          'database.username:',
+          configService.get('database.username'),
+        );
         console.log('synchronize:', process.env.NODE_ENV == 'test');
 
         return {
@@ -81,6 +91,7 @@ const configFactory = () => {
     CarriersModule,
     RoutesModule,
   ],
-  providers: [],
+  controllers: [],
+  providers: [NotificationService],
 })
 export class AppModule {}
