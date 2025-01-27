@@ -24,22 +24,26 @@
       const timeWindows = await response.json();
 
       if (timeWindows.pickup) {
-        pickupStart = timeWindows.pickup.start;
-        pickupEnd = timeWindows.pickup.end;
+        const pickupStartDate = new Date(timeWindows.pickup.start);
+        const pickupEndDate = new Date(timeWindows.pickup.end);
+        pickupStart = new Date(pickupStartDate.getTime() - pickupStartDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        pickupEnd = new Date(pickupEndDate.getTime() - pickupEndDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       } 
       if (timeWindows.delivery) {
-        deliveryStart = timeWindows.delivery.start;
-        deliveryEnd = timeWindows.delivery.end;
+        const deliveryStartDate = new Date(timeWindows.delivery.start);
+        const deliveryEndDate = new Date(timeWindows.delivery.end);
+        deliveryStart = new Date(deliveryStartDate.getTime() - deliveryStartDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+          deliveryEnd = new Date(deliveryEndDate.getTime() - deliveryEndDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       } 
     } catch (error) {
       console.error('Failed to fetch time windows', error);
     }
   }
 
-  let pickupStart: Date = $state(new Date());
-  let pickupEnd: Date = $state(new Date());
-  let deliveryStart: Date = $state(new Date());
-  let deliveryEnd: Date = $state(new Date());
+  let pickupStart: string = $state(new Date().toISOString().slice(0, 16));
+  let pickupEnd: string = $state(new Date().toISOString().slice(0, 16));
+  let deliveryStart: string = $state(new Date().toISOString().slice(0, 16));
+  let deliveryEnd: string = $state(new Date().toISOString().slice(0, 16));
   let error: string = $state('');
   let isLoading = $state(false);
 

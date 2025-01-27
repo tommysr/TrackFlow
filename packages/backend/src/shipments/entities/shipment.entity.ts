@@ -53,14 +53,8 @@ export class Shipment {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @Column('timestamp', { nullable: true })
+  @Column('timestamptz', { nullable: true })
   eta: Date;
-
-  @Column('timestamp', { nullable: true })
-  estimatedPickupTime: Date;
-
-  @Column('timestamp', { nullable: true })
-  estimatedDeliveryTime: Date;
 
   @OneToOne(() => Address, address => address.pickupForShipment, { 
     cascade: true,
@@ -78,28 +72,22 @@ export class Shipment {
   @JoinColumn()
   deliveryAddress?: Address;
 
-  @Column('timestamp', { nullable: true })
-  deliveryDate: Date;
-
-  @Column('timestamp', { nullable: true })
-  pickupDate: Date;
-
   @Column('jsonb', { nullable: true })
   lastRouteSegment: { lat: number; lng: number }[];
 
   @Column({ nullable: true })
   trackingToken: string;
 
-  @Column('timestamp', { nullable: true })
+  @Column('timestamptz', { nullable: true })
   pickupWindowStart?: Date;
 
-  @Column('timestamp', { nullable: true })
+  @Column('timestamptz', { nullable: true })
   pickupWindowEnd?: Date;
 
-  @Column('timestamp', { nullable: true })
+  @Column('timestamptz', { nullable: true })
   deliveryWindowStart?: Date;
 
-  @Column('timestamp', { nullable: true })
+  @Column('timestamptz', { nullable: true })
   deliveryWindowEnd?: Date;
 
   @OneToMany(() => ShipmentRouteHistory, history => history.shipment)

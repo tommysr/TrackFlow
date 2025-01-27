@@ -8,6 +8,6 @@ export class ShipmentSequence {
   @Column('bigint')
   lastProcessedSequence: string;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   lastUpdated: Date;
 } 

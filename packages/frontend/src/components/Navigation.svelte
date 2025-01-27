@@ -220,12 +220,6 @@
     </nav>
 
     <div class="mb-5 space-y-2">
-      {#if apiConnected}
-        <Button onClick={() => {}}>Connected to API</Button>
-      {:else}
-        <Button onClick={connectApi}>Connect API</Button>
-      {/if}
-
       {#if $wallet.connected && $wallet.identity}
         <Button onClick={() => {}}>
           Identity {$wallet.identity.getPrincipal().toText().substring(0, 6)}...

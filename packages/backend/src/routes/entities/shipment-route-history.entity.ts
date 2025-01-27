@@ -25,10 +25,10 @@ export class ShipmentRouteHistory {
   })
   operationType: ShipmentOperationType;
 
-  @Column('timestamp')
+  @Column('timestamptz')
   assignedAt: Date;
 
-  @Column('timestamp', { nullable: true })
+  @Column('timestamptz', { nullable: true })
   completedAt: Date;
 
   @Column('boolean', { default: false })

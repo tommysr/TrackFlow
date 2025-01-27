@@ -9,7 +9,7 @@ import {
 } from 'src/shipments/entities/shipment.entity';
 
 import { LocationService } from '../../common/services/location.service';
-import { RoutingService } from './routing.service';
+import { RouteSegmentUpdate, RoutingService, StopUpdate } from './routing.service';
 import { ETAService } from './eta.service';
 import { RouteDelay } from 'src/routes/entities/route-delay.entity';
 import { RouteMetrics } from 'src/routes/entities/route-metrics.entity';
@@ -52,6 +52,8 @@ export class RouteTrackingService {
     updatedStops: RouteStop[];
     updatedShipments: Shipment[];
     delays: RouteDelay[];
+    updatedSegments: RouteSegmentUpdate[];
+    updatedStopsWithNewETAs: StopUpdate[];
   }> {
     const route = await this.routeRepo.findOne({
       where: {
@@ -124,6 +126,8 @@ export class RouteTrackingService {
       updatedStops,
       updatedShipments,
       delays,
+      updatedSegments: segments,
+      updatedStopsWithNewETAs: stopsWithNewETAs,
     };
   }
 
@@ -267,9 +271,7 @@ export class RouteTrackingService {
     return currentStatus;
   }
 
-  async checkAndUpdateDeliveryStop(
-    shipmentId: string,
-  ): Promise<{
+  async checkAndUpdateDeliveryStop(shipmentId: string): Promise<{
     updatedStop: RouteStop;
     updatedShipment: Shipment;
   } | null> {
@@ -291,7 +293,8 @@ export class RouteTrackingService {
 
     // Find the delivery stop
     const deliveryStop = route.stops.find(
-      (stop) => stop.shipmentId === shipmentId && stop.stopType === StopType.DELIVERY,
+      (stop) =>
+        stop.shipmentId === shipmentId && stop.stopType === StopType.DELIVERY,
     );
 
     if (!deliveryStop || !deliveryStop.shipment) {
@@ -329,7 +332,9 @@ export class RouteTrackingService {
 
     if (!hasMoreStops) {
       // Find and complete END stop if it exists
-      const endStop = route.stops.find((stop) => stop.stopType === StopType.END);
+      const endStop = route.stops.find(
+        (stop) => stop.stopType === StopType.END,
+      );
       if (endStop) {
         endStop.actualArrival = new Date();
         await this.routeStopRepository.save(endStop);

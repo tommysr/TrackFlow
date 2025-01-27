@@ -14,17 +14,22 @@
   import type { MapContext } from 'svelte-maplibre/dist/context';
   import { getContext, onDestroy } from 'svelte';
   import { formatDistance, formatDuration, formatDateTime } from '$lib/format';
-  import { RouteStatus, type Route, type RouteWithActivation } from '$lib/types/route.types';
+  import {
+    RouteStatus,
+    type Route,
+    type RouteWithActivation,
+  } from '$lib/types/route.types';
   import ActiveRoute from '$components/ActiveRoute.svelte';
   import { locationTracking } from '$src/lib/stores/locationTracking.svelte';
   import { addDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
   import { untrack } from 'svelte';
-    import { invalidateAll } from '$app/navigation';
+  import { invalidateAll } from '$app/navigation';
+  import { wallet } from '$src/lib/wallet.svelte';
 
   let { data }: { data: PageData } = $props();
 
   let isMobileOpen = $state(false);
-  let isWalletConnected = $state(true);
+  let isWalletConnected = $derived($wallet.connected);
   let selectedNav = $state(0);
   let selectedShipments = $state<Set<string>>(new Set());
   let selectedRoute = $state<RouteWithActivation | null>(null);
@@ -42,7 +47,7 @@
 
   let shipmentOperations = $state<Map<string, RouteOperationType>>(new Map());
   let scheduledDate = $state<string>(
-    new Date(Date.now() + 30 * 60000).toISOString().slice(0, 16),
+    new Date(Date.now() + 62 * 60000).toISOString().slice(0, 16),
   );
 
   // Add this state to track valid operations for each shipment
@@ -53,7 +58,7 @@
   const categories: {
     name: string;
     data: BoughtShipment[];
-    type: 'available' | 'active' | 'statistics' | 'routes';
+    type: 'available' | 'active' | 'dashboard';
   }[] = [
     {
       name: 'Available',
@@ -61,16 +66,15 @@
       type: 'available',
     },
     {
-      name: 'Active',
+      name: 'Routes',
       data: [],
       type: 'active',
     },
     {
-      name: 'Routes',
+      name: 'Dashboard',
       data: [],
-      type: 'routes',
+      type: 'dashboard',
     },
-    { name: 'Statistics', data: [], type: 'statistics' },
   ];
 
   let store = getContext<MapContext>(Symbol.for('svelte-maplibre')).map;
@@ -208,7 +212,7 @@
           method: 'POST',
           body: JSON.stringify({
             shipments: shipmentOperationsMapped,
-            estimatedStartTime: new Date(scheduledDate).toISOString(),
+            estimatedStartTime: scheduledDate,
             startLocation: startLocation,
             ...(endLocation && { endLocation }),
           }),
@@ -268,7 +272,7 @@
               id,
               type: shipmentOperations.get(id),
             })),
-            estimatedStartTime: new Date(scheduledDate).toISOString(),
+            estimatedStartTime: scheduledDate,
             startLocation,
             ...(endLocation && {
               endLocation,
@@ -311,10 +315,14 @@
     routesLoading = true;
     try {
       // Load all routes and active route in parallel
-      const routesResponse = await authenticatedFetch('http://localhost:5000/routes');
+      const routesResponse = await authenticatedFetch(
+        'http://localhost:5000/routes',
+      );
 
       try {
-        const activeRouteResponse = await authenticatedFetch('http://localhost:5000/routes/active');
+        const activeRouteResponse = await authenticatedFetch(
+          'http://localhost:5000/routes/active',
+        );
         activeRoute = await activeRouteResponse.json();
       } catch (error) {
         console.error('Failed to load active route:', error);
@@ -326,13 +334,14 @@
 
       // Filter out active route from general routes list
       routes = routesData.filter((r) => r.route.status !== 'active');
-
     } catch (error) {
       console.error('Failed to load routes:', error);
     } finally {
       routesLoading = false;
     }
   }
+
+  let activationError = $state<string | null>(null);
 
   async function deleteRoute(id: string) {
     try {
@@ -346,6 +355,7 @@
   }
 
   async function activateRoute(id: string) {
+    activationError = null;
     try {
       const response = await authenticatedFetch(
         `http://localhost:5000/routes/${id}/activate`,
@@ -358,8 +368,18 @@
         // Start location tracking when route is activated
         locationTracking.startTracking();
         await loadRoutes();
+      } else {
+        // Parse and throw the error message from the backend
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to activate route');
       }
     } catch (error) {
+      // Show error in UI
+      const errorMessage = error instanceof Error ? error.message : 'Failed to activate route';
+
+      activationError = errorMessage;
+      
+      // Add error display in the template near the Activate button:
       console.error('Failed to activate route:', error);
     }
   }
@@ -435,9 +455,15 @@
   });
 
   // Add this helper function
-  function getValidOperations(shipment: BoughtShipment, routeDay: Date) {
-    console.log(routeDay);
+  function getValidOperations(shipment: BoughtShipment, routeDay: Date | null) {
+    // If no date is selected, allow selection but mark operations as pending validation
+    if (!routeDay) {
+      console.log('No route day selected, allowing all operations');
+      return { pickup: true, delivery: true, both: true };
+    }
+
     if (!shipment.pickupTimeWindow || !shipment.deliveryTimeWindow) {
+      console.log('Missing time windows for shipment:', shipment.id);
       return { pickup: false, delivery: false, both: false };
     }
 
@@ -446,14 +472,30 @@
     const deliveryStart = new Date(shipment.deliveryTimeWindow.start);
     const deliveryEnd = new Date(shipment.deliveryTimeWindow.end);
 
-    const isValidPickup = isWithinInterval(routeDay, {
-      start: startOfDay(pickupStart),
-      end: endOfDay(pickupEnd),
+    console.log('Validating windows for shipment:', shipment.id, {
+      routeDay: routeDay.toISOString(),
+      pickup: {
+        start: pickupStart.toISOString(),
+        end: pickupEnd.toISOString(),
+      },
+      delivery: {
+        start: deliveryStart.toISOString(),
+        end: deliveryEnd.toISOString(),
+      },
     });
 
-    const isValidDelivery = isWithinInterval(routeDay, {
-      start: startOfDay(deliveryStart),
-      end: endOfDay(deliveryEnd),
+    // Check if route day falls within the windows
+    const isValidPickup =
+      routeDay >= startOfDay(pickupStart) && routeDay <= endOfDay(pickupEnd);
+
+    const isValidDelivery =
+      routeDay >= startOfDay(deliveryStart) &&
+      routeDay <= endOfDay(deliveryEnd);
+
+    console.log('Validation results:', {
+      isValidPickup,
+      isValidDelivery,
+      both: isValidPickup && isValidDelivery,
     });
 
     return {
@@ -463,71 +505,53 @@
     };
   }
 
-  // Remove the regular effect and replace with this:
-  $effect.root(() => {
-    // Initial setup of validOperationsMap
-    function updateValidOperations() {
-      if (!scheduledDate) return;
-      console.log(scheduledDate);
-      const routeDay = startOfDay(new Date(scheduledDate));
-      const newValidOps = new Map();
-      const newShipmentOps = new Map(shipmentOperations);
+  $inspect(scheduledDate);
 
-      const newSelectedShipments = new Set(selectedShipments);
-      let hasChanges = false;
+  function updateValidOperations() {
+    const routeDay = scheduledDate ? startOfDay(new Date(scheduledDate)) : null;
+    console.log('Route day:', routeDay);
+    
+    // Create new maps for validation
+    const newValidOps = new Map();
+    const newShipmentOps = new Map(shipmentOperations);
+    const newSelectedShipments = new Set(selectedShipments);
+    let hasChanges = false;
 
-      console.log(newValidOps);
-      console.log(newShipmentOps);
-      console.log(newSelectedShipments);
-      console.log(hasChanges);
+    // Validate each shipment
+    for (const shipment of categories[selectedNav].data) {
+      const validOps = getValidOperations(shipment, routeDay);
+      newValidOps.set(shipment.id.toString(), validOps);
 
-      untrack(() => {
-        categories[selectedNav].data.forEach((shipment) => {
-          const id = String(shipment.id);
-          newValidOps.set(id, getValidOperations(shipment, routeDay));
-        });
-
-        // Update operations only if they're invalid
-        for (const [id, ops] of newShipmentOps) {
-          const validOps = newValidOps.get(id);
-          if (validOps && !validOps[ops]) {
-            const newType = validOps.both
-              ? RouteOperationType.BOTH
-              : validOps.pickup
-                ? RouteOperationType.PICKUP
-                : validOps.delivery
-                  ? RouteOperationType.DELIVERY
-                  : null;
-
-            if (newType) {
-              newShipmentOps.set(id, newType);
-            } else {
-              newShipmentOps.delete(id);
-              newSelectedShipments.delete(id);
-            }
-            hasChanges = true;
-          }
+      // Only validate and potentially deselect if date is selected
+      if (routeDay && newSelectedShipments.has(shipment.id.toString())) {
+        const currentOp = newShipmentOps.get(shipment.id.toString());
+        const opKey = currentOp?.toLowerCase() as 'pickup' | 'delivery' | 'both';
+        if (currentOp && !validOps[opKey]) {
+          newSelectedShipments.delete(shipment.id.toString());
+          newShipmentOps.delete(shipment.id.toString());
+          hasChanges = true;
         }
-      });
-
-      validOperationsMap = newValidOps;
-      if (hasChanges) {
-        shipmentOperations = newShipmentOps;
-        selectedShipments = newSelectedShipments;
       }
     }
 
-    // Create effect to watch scheduledDate changes
-    $effect(() => {
-      updateValidOperations();
-    });
+    // Update all state at once
+    validOperationsMap = newValidOps;
+    if (hasChanges) {
+      selectedShipments = newSelectedShipments;
+      shipmentOperations = newShipmentOps;
+    }
+  }
 
-    // Return cleanup function
-    return () => {
-      validOperationsMap = new Map();
-      shipmentOperations = new Map();
-      selectedShipments = new Set();
-    };
+  $effect(() => {
+    console.log('Scheduled date changed:', scheduledDate);
+    updateValidOperations();
+  });
+
+  $effect(() => {
+    console.log('Selected nav changed:', selectedNav);
+    if (selectedNav === 0) { // Only validate in Available tab
+      updateValidOperations();
+    }
   });
 </script>
 
@@ -770,6 +794,16 @@
                         </div>
                       {/if}
 
+                      <!-- Add scheduling availability message -->
+                      {#if scheduledDate}
+                        {@const validOps = validOperationsMap.get(String(shipment.id))}
+                        {#if validOps && !validOps.pickup && !validOps.delivery && !validOps.both}
+                          <p class="mt-1 text-xs text-red-500">
+                            Cannot schedule for {new Date(scheduledDate).toISOString()} - outside of time windows
+                          </p>
+                        {/if}
+                      {/if}
+
                       {#if selectedShipments.has(String(shipment.id))}
                         {@const routeDay = startOfDay(new Date(scheduledDate))}
                         {@const validOps = validOperationsMap.get(
@@ -867,7 +901,11 @@
             <div class="text-center">Loading routes...</div>
           </div>
         {:else if activeRoute}
-          <ActiveRoute route={activeRoute} />
+        <div
+        class="flex-1 flex w-full flex-col overflow-y-auto px-4 py-2 space-y-4"
+      >
+            <ActiveRoute route={activeRoute} />
+          </div>
         {:else if routes.length === 0}
           <div class="flex-1 flex items-center">
             <p
@@ -882,18 +920,33 @@
           >
             {#each routes as route}
               {@const now = new Date()}
-              {@const canActivate = route.route.status === RouteStatus.PENDING && route.latestActivationTime && now < new Date(route.latestActivationTime)}
-              {@const timeToActivate = canActivate ? Math.floor((new Date(route.latestActivationTime!).getTime() - now.getTime()) / (1000 * 60)) : 0}
+              {@const canActivate =
+                route.route.status === RouteStatus.PENDING &&
+                route.latestActivationTime &&
+                now < new Date(route.latestActivationTime)}
+              {@const timeToActivate = canActivate
+                ? Math.floor(
+                    (new Date(route.latestActivationTime!).getTime() -
+                      now.getTime()) /
+                      (1000 * 60),
+                  )
+                : 0}
               {@const hours = Math.floor(timeToActivate / 60)}
               {@const minutes = timeToActivate % 60}
-              {@const timeDisplay = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`}
-              
-              <div class="bg-white rounded-lg shadow p-4 space-y-3 hover:ring-2 hover:ring-blue-200">
+              {@const timeDisplay =
+                hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`}
+
+              <div
+                class="bg-white rounded-lg shadow p-4 space-y-3 hover:ring-2 hover:ring-blue-200"
+              >
                 <div class="flex justify-between items-center">
                   <div class="flex items-center gap-2">
-                    <h3 class="text-lg font-semibold">Route #{route.route.id.slice(0, 8)}</h3>
+                    <h3 class="text-lg font-semibold">
+                      Route #{route.route.id.slice(0, 8)}
+                    </h3>
                     <span
-                      class="px-2 py-1 text-sm rounded-full {route.route.status === RouteStatus.PENDING
+                      class="px-2 py-1 text-sm rounded-full {route.route
+                        .status === RouteStatus.PENDING
                         ? 'bg-yellow-100 text-yellow-800'
                         : route.route.status === RouteStatus.COMPLETED
                           ? 'bg-blue-100 text-blue-800'
@@ -902,63 +955,82 @@
                       {route.route.status}
                     </span>
                   </div>
-                    {#if route.route.status === RouteStatus.PENDING}
-                      <span class="{canActivate ? 'text-green-600' : 'text-red-500'} text-sm">
-                        {canActivate ? `Activate in ${timeDisplay}` : `Expired`}
-                      </span>
-                    {/if}
-              
-                 
+                  {#if route.route.status === RouteStatus.PENDING}
+                    <span
+                      class="{canActivate
+                        ? 'text-green-600'
+                        : 'text-red-500'} text-sm"
+                    >
+                      {canActivate ? `Valid ${timeDisplay}` : `Expired`}
+                    </span>
+                  {/if}
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                   <div>
                     <span class="text-sm text-gray-500">Total Distance</span>
-                    <p class="font-medium">{formatDistance(route.route.totalDistance)}</p>
+                    <p class="font-medium">
+                      {formatDistance(route.route.totalDistance)}
+                    </p>
                   </div>
                   <div>
                     <span class="text-sm text-gray-500">Duration</span>
-                    <p class="font-medium">{formatDuration(route.route.estimatedTime)}</p>
+                    <p class="font-medium">
+                      {formatDuration(route.route.estimatedTime)}
+                    </p>
                   </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                   <div>
                     <span class="text-sm text-gray-500">Scheduled Start</span>
-                    <p class="font-medium">{formatDateTime(route.route.date)}</p>
+                    <p class="font-medium">
+                      {formatDateTime(route.route.date)}
+                    </p>
                   </div>
                   <div>
                     <span class="text-sm text-gray-500">Stops</span>
-                    <p class="font-medium">{route.route.metrics?.totalStops || 0} locations</p>
+                    <p class="font-medium">
+                      {route.route.metrics?.totalStops || 0} locations
+                    </p>
                   </div>
                 </div>
 
-                <div class="flex gap-2">
+                <div class="flex gap-2 flex-col">
                   {#if route.route.status === RouteStatus.PENDING}
                     <button
-                      class="px-3 py-1 {canActivate ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded"
+                      class="px-3 py-1 text-white rounded {canActivate 
+                        ? 'bg-gradient-to-r from-primary-400 to-secondary-400 hover:from-primary-500 hover:to-secondary-500'
+                        : 'bg-gray-400 cursor-not-allowed'}"
                       onclick={() => canActivate && activateRoute(route.route.id)}
                       disabled={!canActivate}
-                      title={!canActivate ? 'Route cannot be activated - outside of time windows' : undefined}
+                      title={!canActivate
+                        ? 'Route cannot be activated - outside of time windows'
+                        : undefined}
                     >
                       Activate
                     </button>
                   {/if}
-   
+
                   {#if route.route.status === RouteStatus.PENDING}
                     <button
-                      class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                      class="px-3 py-1 text-white rounded bg-gradient-to-r from-red-400 to-red-500 hover:from-red-500 hover:to-red-600"
                       onclick={() => deleteRoute(route.route.id)}
                     >
                       Delete
                     </button>
                   {/if}
+
+                  <!-- Add error message display -->
+                  {#if activationError}
+                    <p class="text-sm text-red-500">
+                      {activationError}
+                    </p>
+                  {/if}
                 </div>
 
                 {#if route.route.metrics?.isDelayed}
-                  <div class="text-red-500 text-sm">
-                    Route is delayed
-                  </div>
+                  <div class="text-red-500 text-sm">Route is delayed</div>
                 {/if}
               </div>
             {/each}

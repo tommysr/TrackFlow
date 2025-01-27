@@ -493,6 +493,7 @@ export class RoutesService {
       };
     });
   }
+  
 
   private calculateLatestActivationTime(route: Route): Date | null {
     if (!route.stops?.length) return null;
@@ -715,7 +716,7 @@ export class RoutesService {
 
   async recalculateRouteTimes(route: Route, currentTime: Date) {
     console.log('recalculating route times', route.segments);
-    route.stops = route.stops.map((stop, index) => ({
+    route.stops = route.stops.sort((a, b) => a.sequenceIndex - b.sequenceIndex).map((stop, index) => ({
       ...stop,
       estimatedArrival: this.calculateStopEstimatedTime(
         currentTime,
@@ -835,7 +836,7 @@ export class RoutesService {
       throw new NotFoundException('No active route found');
     }
 
-    const nextStop = route.stops.find((stop) => !stop.actualArrival);
+    const nextStop = route.stops.sort((a, b) => a.sequenceIndex - b.sequenceIndex).find((stop) => !stop.actualArrival);
     const remainingStops = route.stops.filter(
       (stop) => !stop.actualArrival && stop.id !== nextStop?.id,
     );
@@ -861,7 +862,7 @@ export class RoutesService {
       throw new NotFoundException('No active route found');
     }
 
-    const nextStop = route.stops.find((stop) => !stop.actualArrival);
+    const nextStop = route.stops.sort((a, b) => a.sequenceIndex - b.sequenceIndex).find((stop) => !stop.actualArrival);
 
     return {
       completedStops: route.metrics.completedStops,

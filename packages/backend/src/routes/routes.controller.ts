@@ -18,6 +18,8 @@ import { Shipment } from 'src/shipments/entities/shipment.entity';
 import { RouteDelay } from './entities/route-delay.entity';
 import { RouteMetrics } from './entities/route-metrics.entity';
 import { RouteWithActivationDto } from './dto/route-with-activation.dto';
+import { RouteSegmentUpdate } from 'src/core/services/routing.service';
+import { StopUpdate } from 'src/core/services/routing.service';
 
 @ApiTags('routes')
 @Controller('routes')
@@ -133,6 +135,8 @@ export class RoutesController {
     updatedStops: RouteStop[];
     delays: RouteDelay[];
     updatedShipments: Shipment[];
+    updatedSegments: RouteSegmentUpdate[];
+    updatedStopsWithNewETAs: StopUpdate[];
   }> {
     return this.routeTrackingService.updateCarrierLocation(
       user.principal,

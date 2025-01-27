@@ -32,8 +32,12 @@
 
   let isSelectMode = $state(false);
   let selectModeType: 'source' | 'destination' = $state('source');
-
+  let secretKey = $state('');
   let error: string | null = $state(null);
+
+  let showSecretConfirmation = $state(false);
+  let generatedSecret = $state('');
+  let shipmentId = $state('');
 
   const generateRandomSecret = () => {
     const secret = crypto.getRandomValues(new Uint8Array(32));
@@ -41,6 +45,15 @@
       .map((byte) => byte.toString(16).padStart(2, '0'))
       .join('');
     return secretHex;
+  };
+
+  const continueWithShipment = () => {
+    setLocalStorage(shipmentId.toString(), generatedSecret);
+    isSelectMode = false;
+    showMarkers = false;
+    showSecretConfirmation = false;
+    showModal = false;
+    onShipmentCreated(shipmentId.toString());
   };
 
   const createShipment = async (e: Event) => {
@@ -53,6 +66,7 @@
     try {
       const priceBigint = BigInt(price);
       const secret = generateRandomSecret();
+      generatedSecret = secret;
       const hash = sha256.create();
       hash.update(secret);
       const hashed = hash.hex();
@@ -76,10 +90,8 @@
 
       if (Object.keys(res)[0] === 'Ok') {
         const id = (res as { Ok: bigint }).Ok;
-        setLocalStorage(id.toString(), secret);
-        isSelectMode = false;
-        showMarkers = false;
-        onShipmentCreated(id.toString());
+        shipmentId = id.toString();
+        showSecretConfirmation = true;
       } else {
         console.error('Failed to create shipment', res);
         return;
@@ -256,6 +268,39 @@
   <Marker lngLat={[destination.lng, destination.lat]}>
     <div class="pin bounce-a cursor-pointer active"></div>
   </Marker>
+{/if}
+
+{#if showSecretConfirmation}
+  <Modal showModal={true} onClose={() => {}}>
+    <div class="flex flex-col space-y-4 items-center">
+      <h2 class="text-2xl font-semibold text-center">Important: Save Your Secret</h2>
+      <p class="text-center text-gray-600">Please copy and save this secret. You'll need it to track your shipment:</p>
+      <div class="flex items-center gap-2">
+        <input
+          type="text"
+          value={generatedSecret}
+          class="w-full px-3 py-2 border rounded-md"
+          placeholder="Enter delivery secret key"
+          id="secretKey"
+          readonly
+        />
+        <button
+          class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+          onclick={() => {
+            navigator.clipboard.writeText(secretKey);
+          }}
+        >
+          Copy
+        </button>
+      </div>
+      <button
+        class="bg-gradient-to-r from-blue-500 to-rose-400 rounded-full px-7 py-2 w-3/5 mx-auto text-white text-base transition ease-in-out hover:-translate-y-0.5 hover:scale-105 duration-200"
+        onclick={continueWithShipment}
+      >
+        I've saved the secret, continue
+      </button>
+    </div>
+  </Modal>
 {/if}
 
 {#if error}

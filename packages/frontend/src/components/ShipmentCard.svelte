@@ -93,33 +93,30 @@
     </div>
   </div>
 
-  
   {#if isBoughtShipment(shipment) && cardType === 'shipper'}
     <div class="space-y-2">
       <div class="flex justify-between">
         <span class="text-sm text-gray-500">Estimated Pickup</span>
-        <span
-          class={isToday(shipment.estimatedPickupDate) ? 'text-green-500' : ''}
-        >
-          {shipment.estimatedPickupDate?.toLocaleDateString() ??
-            'Pending Route'}
-        </span>
+        {#if shipment.estimatedPickupDate}
+          {@const pickupDate = new Date(shipment.estimatedPickupDate)}
+          <span class={isToday(pickupDate) ? 'text-green-500' : ''}>
+            {pickupDate.toLocaleString()}
+            
+          </span>
+        {/if}
       </div>
       <div class="flex justify-between">
         <span class="text-sm text-gray-500">Estimated Delivery</span>
-        <span
-          class={isToday(shipment.estimatedDeliveryDate)
-            ? 'text-green-500'
-            : ''}
-        >
-          {shipment.estimatedDeliveryDate?.toLocaleDateString() ??
-            'Pending Route'}
-        </span>
+        {#if shipment.estimatedDeliveryDate}
+          {@const deliveryDate = new Date(shipment.estimatedDeliveryDate)}
+          <span class={isToday(deliveryDate) ? 'text-green-500' : ''}>
+            {deliveryDate.toLocaleString  ()}
+          
+          </span>
+        {/if}
       </div>
     </div>
   {/if}
-
- 
 
   {#if isInTransitShipment(shipment)}
     <div class="space-y-2">

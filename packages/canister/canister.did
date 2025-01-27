@@ -12,7 +12,7 @@ type Shipment = record {
   carrier : opt principal;
 };
 type ShipmentEvent = variant {
-  Finalized : record { shipment_id : nat64; party : principal };
+  Finalized : record { shipment_id : nat64};
   CarrierAssigned : record { shipment_id : nat64; carrier : principal };
   Created : record { shipment_id : nat64 };
   StatusUpdated : record { status : ShipmentStatus; shipment_id : nat64 };

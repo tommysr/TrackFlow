@@ -57,16 +57,14 @@ export interface TimeWindow {
 // Bought shipments
 export interface BoughtShipmentResponse extends PendingShipmentResponse {
   assignedCarrier: CarrierResponse;
-  estimatedPickupDate?: Date;
-  estimatedDeliveryDate?: Date;
+  estimatedPickupDate?: string;
+  estimatedDeliveryDate?: string;
   pickupTimeWindow?: TimeWindow;
   deliveryTimeWindow?: TimeWindow;
 }
 
 // In transit shipments
 export interface InTransitShipmentResponse extends BoughtShipmentResponse {
-  estimatedPickupDate?: Date;
-  estimatedDeliveryDate?: Date;
   currentLocation?: LocationResponse;
   lastUpdate?: Date;
   eta?: number;

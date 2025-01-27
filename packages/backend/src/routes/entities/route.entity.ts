@@ -48,7 +48,7 @@ export class Route {
   @Transform(({ value }) => Number(value))
   estimatedTime: number; // in minutes
 
-  @Column('timestamp')
+  @Column('timestamptz')
   date: Date;
 
   @Column('boolean', { default: false })
@@ -67,7 +67,7 @@ export class Route {
   })
   status: RouteStatus;
 
-  @Column('timestamp', { nullable: true })
+  @Column('timestamptz', { nullable: true })
   lastLocationUpdate: Date;
 
   @Column('geometry', {
@@ -98,10 +98,10 @@ export class Route {
   @OneToMany(() => RouteSegment, segment => segment.route, { cascade: true, onDelete: 'CASCADE' })
   segments: RouteSegment[];
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   startedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   completedAt: Date;
 
   @OneToMany(() => ShipmentRouteHistory, history => history.route, { cascade: true, onDelete: 'CASCADE' })

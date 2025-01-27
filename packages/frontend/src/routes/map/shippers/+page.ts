@@ -80,6 +80,8 @@ export const load: PageLoad = async ({
           pickup: backendData.pickup,
           delivery: backendData.delivery,
           assignedCarrier: backendData.assignedCarrier,
+          estimatedPickupDate: backendData.estimatedPickupDate,
+          estimatedDeliveryDate: backendData.estimatedDeliveryDate,
         };
       }).filter((shipment) => shipment !== null);
     }

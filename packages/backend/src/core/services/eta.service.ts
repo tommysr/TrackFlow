@@ -31,15 +31,18 @@ export class ETAService {
     await Promise.all(
       updatedStops.map(async (update) => {
         const stop = route.stops.find((s) => s.id === update.id);
+        
+        // Compare the expected arrival (from current location) with original ETA
         const originalEta = stop.estimatedArrival;
-        const newEta = update.estimatedArrival;
+        const expectedArrival = update.estimatedArrival;
 
-        if (newEta > originalEta) {
+        // Only create a delay if we expect to arrive later than original ETA
+        if (expectedArrival > originalEta) {
           const delay = this.routeDelayRepo.create({
             stop,
             recordedAt: new Date(),
             delayMinutes: Math.round(
-              (newEta.getTime() - originalEta.getTime()) / 60000,
+              (expectedArrival.getTime() - originalEta.getTime()) / 60000,
             ),
             location: LocationDto.toGeoJSON(
               currentLocation.lng,
@@ -47,13 +50,11 @@ export class ETAService {
             ),
             metadata: {
               originalEta,
-              updatedEta: newEta,
+              updatedEta: expectedArrival,
             },
           });
           delays.push(await this.routeDelayRepo.save(delay));
         }
-
-        return Object.assign(stop, update);
       }),
     );
 
@@ -64,6 +65,7 @@ export class ETAService {
     route: Route,
     currentLocation: LocationDto,
   ): Promise<RouteUpdateResult> {
+    // Get expected arrival times based on current location
     const routeUpdate = await this.routingService.calculateRouteUpdate(
       currentLocation,
       route.stops,
