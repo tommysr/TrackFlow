@@ -1,5 +1,16 @@
 import { authenticatedFetch } from '$lib/canisters';
-import type { LocationUpdate, RouteProgress } from '../types/route.types';
+import type { LocationUpdate, RouteProgress, RouteStop } from '../types/route.types';
+
+interface RouteSegment {
+  fromStopId: string;
+  toStopId: string;
+  distance: number;
+  duration: number;
+  path: {
+    type: 'LineString';
+    coordinates: [number, number][];
+  };
+}
 
 export class LocationTrackingStore {
   isTracking = $state(false);
@@ -9,6 +20,8 @@ export class LocationTrackingStore {
   isTestMode = $state(false);
   routeProgress = $state<RouteProgress | null>(null);
   lastLocationUpdate = $state<LocationUpdate | null>(null);
+  updatedSegments = $state<RouteSegment[]>([]);
+  updatedStopsWithNewETAs = $state<Partial<RouteStop>[]>([]);
 
   private intervalId: NodeJS.Timeout | null = null;
 
@@ -29,13 +42,16 @@ export class LocationTrackingStore {
               body: JSON.stringify({
                 lat: position.coords.latitude,
                 lng: position.coords.longitude,
-                timestamp: new Date().toISOString(),
+                timestamp: new Date(),
               }),
             },
           );
 
           if (response.ok) {
-            this.lastLocationUpdate = await response.json();
+            const data = await response.json();
+            this.lastLocationUpdate = data;
+            this.updatedSegments = data.updatedSegments || [];
+            this.updatedStopsWithNewETAs = data.updatedStopsWithNewETAs || [];
 
             // Get route progress
             const progressResponse = await authenticatedFetch(
@@ -76,6 +92,8 @@ export class LocationTrackingStore {
     this.isTracking = false;
     this.routeProgress = null;
     this.lastLocationUpdate = null;
+    this.updatedSegments = [];
+    this.updatedStopsWithNewETAs = [];
   }
 
   toggleTestMode() {
@@ -97,7 +115,10 @@ export class LocationTrackingStore {
       );
 
       if (response.ok) {
-        this.lastLocationUpdate = await response.json();
+        const data = await response.json();
+        this.lastLocationUpdate = data;
+        this.updatedSegments = data.updatedSegments || [];
+        this.updatedStopsWithNewETAs = data.updatedStopsWithNewETAs || [];
 
         // Get route progress
         const progressResponse = await authenticatedFetch(

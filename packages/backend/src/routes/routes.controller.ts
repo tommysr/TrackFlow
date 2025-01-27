@@ -18,6 +18,8 @@ import { Shipment } from 'src/shipments/entities/shipment.entity';
 import { RouteDelay } from './entities/route-delay.entity';
 import { RouteMetrics } from './entities/route-metrics.entity';
 import { RouteWithActivationDto } from './dto/route-with-activation.dto';
+import { RouteSegmentUpdate } from 'src/core/services/routing.service';
+import { StopUpdate } from 'src/core/services/routing.service';
 
 @ApiTags('routes')
 @Controller('routes')
@@ -133,6 +135,8 @@ export class RoutesController {
     updatedStops: RouteStop[];
     delays: RouteDelay[];
     updatedShipments: Shipment[];
+    updatedSegments: RouteSegmentUpdate[];
+    updatedStopsWithNewETAs: StopUpdate[];
   }> {
     return this.routeTrackingService.updateCarrierLocation(
       user.principal,
@@ -181,4 +185,24 @@ export class RoutesController {
   // ): Promise<RouteDelay[]> {
   //   return this.routesService.getDelayHistory(routeId, query);
   // }
+
+  @Post('check-delivery')
+  @ApiOperation({ summary: 'Check delivery status and update route data' })
+  @UseGuards(ShipmentSyncGuard) // First sync ICP events
+  async checkAndUpdateDelivery(
+    @Body() data: { shipmentId: string },
+  ): Promise<{
+    updatedStop?: RouteStop;
+    updatedShipment?: Shipment;
+    wasUpdated: boolean;
+  }> {
+    const result = await this.routeTrackingService.checkAndUpdateDeliveryStop(
+      data.shipmentId,
+    );
+
+    return {
+      ...result,
+      wasUpdated: !!result,
+    };
+  }
 }

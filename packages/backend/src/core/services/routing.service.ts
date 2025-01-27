@@ -62,7 +62,7 @@ export class RoutingService {
         lat: (stop.location as GeoPoint).coordinates[1],
         lng: (stop.location as GeoPoint).coordinates[0],
         type: stop.stopType as StopType,
-        shipmentId: stop.shipmentId, // Include shipmentId to maintain pickup/delivery constraints
+        shipmentId: stop.shipmentId,
       })),
     ]);
 
@@ -70,7 +70,7 @@ export class RoutingService {
     const { distance, duration } =
       routeDetails.data.features[0].properties.summary;
 
-    // Calculate new ETAs and create segments
+    // Calculate expected arrival times based on current progress
     let cumulativeTime = 0;
     const updatedStops: StopUpdate[] = [];
     const segments: RouteSegmentUpdate[] = [];
@@ -78,11 +78,10 @@ export class RoutingService {
     const routeSegments = routeDetails.data.features[0].properties.segments;
     const routeGeometry = routeDetails.data.features[0].geometry;
 
-    // Find the first stop's original ETA to use as base time
-    const startStopTime = stops[0]?.estimatedArrival?.getTime()
+    // Use current time as the base for expected arrival calculations
+    const now = new Date();
 
     routeSegments.forEach((segment, index) => {
-      // Use way_points to get the correct coordinate indices
       const startIdx = segment.steps[0].way_points[0];
       const endIdx = segment.steps[segment.steps.length - 1].way_points[1];
       const segmentCoordinates = routeGeometry.coordinates.slice(startIdx, endIdx + 1);
@@ -91,9 +90,11 @@ export class RoutingService {
       const stop = remainingStops[index];
 
       if (stop) {
+        // Calculate expected arrival time based on current location and route
+        const expectedArrival = new Date(now.getTime() + cumulativeTime * 1000);
         updatedStops.push({
           id: stop.id,
-          estimatedArrival: new Date(startStopTime + cumulativeTime * 1000),
+          estimatedArrival: expectedArrival,
         });
       }
 
@@ -108,8 +109,8 @@ export class RoutingService {
               type: 'LineString',
               coordinates: segmentCoordinates
             },
-            distance: Number(segment.distance),
-            duration: Number(segment.duration),
+            distance: Number(segment.distance) / 1000,
+            duration: Number(segment.duration) / 60,
           });
         }
       }

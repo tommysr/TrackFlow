@@ -9,7 +9,7 @@ import {
 } from 'src/shipments/entities/shipment.entity';
 
 import { LocationService } from '../../common/services/location.service';
-import { RoutingService } from './routing.service';
+import { RouteSegmentUpdate, RoutingService, StopUpdate } from './routing.service';
 import { ETAService } from './eta.service';
 import { RouteDelay } from 'src/routes/entities/route-delay.entity';
 import { RouteMetrics } from 'src/routes/entities/route-metrics.entity';
@@ -52,6 +52,8 @@ export class RouteTrackingService {
     updatedStops: RouteStop[];
     updatedShipments: Shipment[];
     delays: RouteDelay[];
+    updatedSegments: RouteSegmentUpdate[];
+    updatedStopsWithNewETAs: StopUpdate[];
   }> {
     const route = await this.routeRepo.findOne({
       where: {
@@ -95,10 +97,14 @@ export class RouteTrackingService {
     }
 
     // Calculate actual metrics
-    const totalStops = route.stops.filter((s) => s.stopType !== StopType.END && s.stopType !== StopType.START);
+    const totalStops = route.stops.filter(
+      (s) => s.stopType !== StopType.END && s.stopType !== StopType.START,
+    );
     const totalStopsCount = totalStops.length;
-    const completedStopsCount = totalStops.filter((s) => s.actualArrival).length;
- 
+    const completedStopsCount = totalStops.filter(
+      (s) => s.actualArrival,
+    ).length;
+
     if (!route.metrics) {
       throw new Error('Route metrics not found');
     }
@@ -120,6 +126,8 @@ export class RouteTrackingService {
       updatedStops,
       updatedShipments,
       delays,
+      updatedSegments: segments,
+      updatedStopsWithNewETAs: stopsWithNewETAs,
     };
   }
 
@@ -155,10 +163,9 @@ export class RouteTrackingService {
       currentStop.actualArrival = new Date();
       const updatedStop = await this.routeStopRepository.save(currentStop);
       updatedStops.push(updatedStop);
-    } else if (
-      currentStop.stopType === StopType.PICKUP ||
-      currentStop.stopType === StopType.DELIVERY
-    ) {
+    }
+    // Only handle PICKUP stops - DELIVERY will be handled by ICP events
+    else if (currentStop.stopType === StopType.PICKUP) {
       if (await this.isNearStop(currentLocation, currentStop)) {
         currentStop.actualArrival = new Date();
         const updatedStop = await this.routeStopRepository.save(currentStop);
@@ -186,24 +193,21 @@ export class RouteTrackingService {
             );
             updatedShipments.push(updatedShipment);
           }
-        }
 
-        // Update shipment route history
-        const history = await this.shipmentRouteHistoryRepo.findOne({
-          where: {
-            route: { id: route.id },
-            shipment: { id: currentStop.shipment?.id },
-            operationType:
-              currentStop.stopType === StopType.PICKUP
-                ? ShipmentOperationType.PICKUP
-                : ShipmentOperationType.DELIVERY,
-          },
-        });
+          // Update shipment route history
+          const history = await this.shipmentRouteHistoryRepo.findOne({
+            where: {
+              route: { id: route.id },
+              shipment: { id: currentStop.shipment?.id },
+              operationType: ShipmentOperationType.PICKUP,
+            },
+          });
 
-        if (history) {
-          history.completedAt = new Date();
-          history.isSuccessful = true;
-          await this.shipmentRouteHistoryRepo.save(history);
+          if (history) {
+            history.completedAt = new Date();
+            history.isSuccessful = true;
+            await this.shipmentRouteHistoryRepo.save(history);
+          }
         }
       }
     }
@@ -265,5 +269,86 @@ export class RouteTrackingService {
     }
 
     return currentStatus;
+  }
+
+  async checkAndUpdateDeliveryStop(shipmentId: string): Promise<{
+    updatedStop: RouteStop;
+    updatedShipment: Shipment;
+  } | null> {
+    // Find the active route with this shipment's delivery stop
+    const route = await this.routeRepo.findOne({
+      where: {
+        status: RouteStatus.ACTIVE,
+        stops: {
+          shipmentId,
+          stopType: StopType.DELIVERY,
+        },
+      },
+      relations: ['stops', 'stops.shipment'],
+    });
+
+    if (!route) {
+      return null;
+    }
+
+    // Find the delivery stop
+    const deliveryStop = route.stops.find(
+      (stop) =>
+        stop.shipmentId === shipmentId && stop.stopType === StopType.DELIVERY,
+    );
+
+    if (!deliveryStop || !deliveryStop.shipment) {
+      return null;
+    }
+
+    // Check if shipment is marked as delivered in the database
+    if (deliveryStop.shipment.status !== ShipmentStatus.DELIVERED) {
+      return null;
+    }
+
+    // Only update if stop hasn't been marked as completed yet
+    if (deliveryStop.actualArrival) {
+      return null;
+    }
+
+    // Update stop with actual arrival time
+    deliveryStop.actualArrival = new Date(); // Use current time as delivery was confirmed
+    const updatedStop = await this.routeStopRepository.save(deliveryStop);
+
+    // Create shipment route history record
+    await this.shipmentRouteHistoryRepo.save({
+      shipment: deliveryStop.shipment,
+      route,
+      operationType: ShipmentOperationType.DELIVERY,
+      assignedAt: route.date,
+      completedAt: new Date(),
+      isSuccessful: true,
+    });
+
+    // Check if this was the last stop and complete route if needed
+    const hasMoreStops = route.stops.some(
+      (stop) => !stop.actualArrival && stop.stopType !== StopType.END,
+    );
+
+    if (!hasMoreStops) {
+      // Find and complete END stop if it exists
+      const endStop = route.stops.find(
+        (stop) => stop.stopType === StopType.END,
+      );
+      if (endStop) {
+        endStop.actualArrival = new Date();
+        await this.routeStopRepository.save(endStop);
+      }
+
+      // Complete the route
+      route.status = RouteStatus.COMPLETED;
+      route.completedAt = new Date();
+      await this.routeRepo.save(route);
+    }
+
+    return {
+      updatedStop,
+      updatedShipment: deliveryStop.shipment,
+    };
   }
 }

@@ -9,21 +9,21 @@ export class AddressDto {
   @ApiProperty({
     description: 'Street address including building number',
     example: 'ul. Krakowska 15',
-    pattern: '^[a-zA-Z0-9\\s,.-]+$'
+    pattern: '^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ0-9\\s,.-]+$'
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[a-zA-Z0-9\s,.-]+$/)
+  @Matches(/^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ0-9\s,.-]+$/)  
   street: string;
 
   @ApiProperty({
     description: 'City name',
     example: 'Warszawa',
-    pattern: '^[a-zA-Z\\s.-]+$'
+    pattern: '^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ\\s.-]+$'
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[a-zA-Z\s.-]+$/)
+  @Matches(/^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ\s.-]+$/)
   city: string;
 
   @ApiProperty({

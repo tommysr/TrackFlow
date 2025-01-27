@@ -249,7 +249,7 @@ export class ShipmentsService {
     const shipments = await this.shipmentRepository.find({
       where: {
         shipper: { principal },
-        status: ShipmentStatus.BOUGHT,
+        status: In([ShipmentStatus.BOUGHT, ShipmentStatus.ROUTE_SET]),
       },
       relations: [
         'shipper',
@@ -260,29 +260,51 @@ export class ShipmentsService {
       ],
     });
 
-    return shipments.map((shipment) => ({
-      ...this.toPendingShipmentResponseDto(shipment),
-      assignedCarrier: shipment.carrier
-        ? {
-            name: shipment.carrier.user.name ?? 'Carrier',
-            principal: shipment.carrier.principal,
-          }
-        : null,
-      estimatedPickupDate: shipment.estimatedPickupTime,
-      estimatedDeliveryDate: shipment.estimatedDeliveryTime,
-      pickupTimeWindow: shipment.pickupWindowStart && shipment.pickupWindowEnd
-        ? {
-            start: shipment.pickupWindowStart,
-            end: shipment.pickupWindowEnd,
-          }
-        : undefined,
-      deliveryTimeWindow: shipment.deliveryWindowStart && shipment.deliveryWindowEnd
-        ? {
-            start: shipment.deliveryWindowStart,
-            end: shipment.deliveryWindowEnd,
-          }
-        : undefined,
-    }));
+    // Get all route stops for these shipments
+    const stops = await this.routeStopRepo.find({
+      where: {
+        shipmentId: In(shipments.map(s => s.id)),
+        route: {
+          status: Not(In([RouteStatus.COMPLETED, RouteStatus.CANCELLED])),
+        },
+        stopType: In(['PICKUP', 'DELIVERY']),
+      },
+      relations: ['shipment'],
+    });
+
+    return shipments.map((shipment) => {
+      // Find pickup and delivery stops for this shipment
+      const pickupStop = stops.find(
+        stop => stop.shipmentId === shipment.id && stop.stopType === 'PICKUP'
+      );
+      const deliveryStop = stops.find(
+        stop => stop.shipmentId === shipment.id && stop.stopType === 'DELIVERY'
+      );
+
+      return {
+        ...this.toPendingShipmentResponseDto(shipment),
+        assignedCarrier: shipment.carrier
+          ? {
+              name: shipment.carrier.user.name ?? 'Carrier',
+              principal: shipment.carrier.principal,
+            }
+          : null,
+        estimatedPickupDate: pickupStop?.estimatedArrival,
+        estimatedDeliveryDate: deliveryStop?.estimatedArrival,
+        pickupTimeWindow: shipment.pickupWindowStart && shipment.pickupWindowEnd
+          ? {
+              start: shipment.pickupWindowStart,
+              end: shipment.pickupWindowEnd,
+            }
+          : undefined,
+        deliveryTimeWindow: shipment.deliveryWindowStart && shipment.deliveryWindowEnd
+          ? {
+              start: shipment.deliveryWindowStart,
+              end: shipment.deliveryWindowEnd,
+            }
+          : undefined,
+      };
+    });
   }
 
   async setTimeWindows(
@@ -358,16 +380,25 @@ export class ShipmentsService {
       ],
     });
 
-    return shipments.map((shipment) => ({
-      ...this.toPendingShipmentResponseDto(shipment),
-      assignedCarrier: shipment.carrier
+    return shipments.map((shipment) => {
+      // Find pickup and delivery stops for this shipment
+      const pickupStop = routeStops.find(
+        stop => stop.shipmentId === shipment.canisterShipmentId && stop.stopType === 'PICKUP'
+      );
+      const deliveryStop = routeStops.find(
+        stop => stop.shipmentId === shipment.canisterShipmentId && stop.stopType === 'DELIVERY'
+      );
+
+      return {
+        ...this.toPendingShipmentResponseDto(shipment),
+        assignedCarrier: shipment.carrier
         ? {
             name: shipment.carrier.user.name ?? 'Carrier',
             principal: shipment.carrier.principal,
           }
         : null,
-      estimatedPickupDate: shipment.estimatedPickupTime,
-      estimatedDeliveryDate: shipment.estimatedDeliveryTime,
+      estimatedPickupDate: pickupStop?.estimatedArrival,
+      estimatedDeliveryDate: deliveryStop?.estimatedArrival,
       pickupTimeWindow: shipment.pickupWindowStart && shipment.pickupWindowEnd
         ? {
             start: shipment.pickupWindowStart,
@@ -380,6 +411,7 @@ export class ShipmentsService {
             end: shipment.deliveryWindowEnd,
           }
         : undefined,
-    }));
+      };
+    });
   }
 }

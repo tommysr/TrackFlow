@@ -9,7 +9,7 @@ export class RouteDelay {
   @ManyToOne(() => RouteStop)
   stop: RouteStop;
 
-  @Column('timestamp')
+  @Column('timestamptz')
   recordedAt: Date;
 
   @Column('int')

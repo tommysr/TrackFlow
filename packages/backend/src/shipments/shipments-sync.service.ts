@@ -37,6 +37,12 @@ export function isBoughtEvent(
   );
 }
 
+export function isFinalizedEvent(
+  event: CanisterShipmentEvent,
+): event is { Finalized: { shipment_id: bigint } } {
+  return (event as { Finalized: { shipment_id: bigint } }).Finalized !== undefined;
+}
+
 @Injectable()
 export class ShipmentsSyncService {
   private readonly logger = new Logger(ShipmentsSyncService.name);
@@ -119,6 +125,9 @@ export class ShipmentsSyncService {
     } else if (isBoughtEvent(event)) {
       this.logger.debug('Handling carrier assigned event');
       await this.handleCarrierAssigned(event);
+    } else if (isFinalizedEvent(event)) {
+      this.logger.debug('Handling shipment finalized event');
+      await this.handleShipmentFinalized(event);
     }
   }
 
@@ -295,5 +304,28 @@ export class ShipmentsSyncService {
     }
 
     return carrier;
+  }
+
+  private async handleShipmentFinalized(event: {
+    Finalized: { shipment_id: bigint };
+  }) {
+    const shipment = await this.shipmentRepository.findOne({
+      where: {
+        canisterShipmentId: event.Finalized.shipment_id.toString(),
+      },
+    });
+
+    if (!shipment) {
+      this.logger.debug('Shipment not found');
+      throw new NotFoundException('Shipment not found');
+    }
+
+    // Update shipment status to DELIVERED
+    shipment.status = ShipmentStatus.DELIVERED;
+    await this.shipmentRepository.save(shipment);
+    
+    this.logger.debug(
+      `Updated shipment ${shipment.canisterShipmentId} status to DELIVERED`,
+    );
   }
 }

@@ -133,7 +133,7 @@
                         {#if shipment.estimatedDeliveryDate}
                           <p>
                             Estimated Delivery: {formatDateTime(
-                              shipment.estimatedDeliveryDate,
+                              new Date(shipment.estimatedDeliveryDate),
                             )}
                           </p>
                         {/if}
@@ -169,13 +169,7 @@
                             )}
                           </p>
                         {/if}
-                        {#if shipment.estimatedPickupDate}
-                          <p>
-                            Estimated Pickup: {formatDateTime(
-                              shipment.estimatedPickupDate,
-                            )}
-                          </p>
-                        {/if}
+                        
                         <button
                           class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full"
                           onclick={() => copyTrackingLink(shipment)}

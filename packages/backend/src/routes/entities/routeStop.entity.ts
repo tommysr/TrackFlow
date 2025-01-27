@@ -34,9 +34,12 @@ export class RouteStop {
   })
   location: object;
 
-  @Column('timestamp', { nullable: true })
+  @Column('timestamptz', { nullable: true })
+  plannedArrival?: Date;
+  
+  @Column('timestamptz', { nullable: true })
   estimatedArrival?: Date;
 
-  @Column('timestamp', { nullable: true })
+  @Column('timestamptz', { nullable: true })
   actualArrival?: Date;
 }

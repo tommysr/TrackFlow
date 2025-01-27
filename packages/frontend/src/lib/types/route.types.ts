@@ -26,9 +26,15 @@ export interface Route {
   stops: RouteStop[];
   startedAt?: string;
   updatedAt?: string;
+  lastLocationUpdate?: string;
   fullPath: {
     type: 'LineString';
     coordinates: [number, number][];
+  };
+  completedAt?: string;
+  lastLocation?: {
+    type: 'Point';
+    coordinates: [number, number];
   };
 }
 
@@ -50,6 +56,7 @@ export interface RouteStop {
   actualArrival?: string;
   shipment?: {
     id: string;
+    canisterShipmentId: string;
   };
 }
 
@@ -102,9 +109,29 @@ export interface RouteProgress {
   nextStopEta?: Date;
 }
 
+export interface GeoLineString {
+  type: 'LineString';
+  coordinates: [number, number][]; // Array of [longitude, latitude] pairs
+}
+
+export interface RouteSegmentUpdate {
+  fromStopId: string;
+  toStopId: string;
+  path: GeoLineString;
+  distance: number;
+  duration: number;
+}
+
+export interface StopUpdate {
+  id: string;
+  estimatedArrival: Date;
+}
+
 export interface LocationUpdate {
   updatedRoute: Route;
   updatedStops: RouteStop[];
-  delays: RouteDelay[];
   updatedShipments: Shipment[];
+  updatedSegments: RouteSegmentUpdate[];
+  updatedStopsWithNewETAs: StopUpdate[];
+  delays: RouteDelay[];
 }
