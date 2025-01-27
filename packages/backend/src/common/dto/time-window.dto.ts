@@ -3,15 +3,21 @@ import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class TimeWindowDto {
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Start time',
+    type: Date,
+  })
   @IsDate()
   @IsNotEmpty()
   @Type(() => Date)
   start: Date;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'End time',
+    type: Date,
+  })
   @IsDate()
   @IsNotEmpty()
   @Type(() => Date)
   end: Date;
-} 
+}

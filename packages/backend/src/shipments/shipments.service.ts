@@ -15,12 +15,10 @@ import {
   InTransitShipmentResponseDto,
   PendingShipmentResponseDto,
 } from './dto/shipment-response.dto';
-import { ShipmentsSyncService } from './shipments-sync.service';
 import { GeocodeAddressDto, SetAddressDto } from './dto/create-shipment.dto';
 import { geocodeAddress } from '../utils/geocode.util';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
-import * as crypto from 'crypto';
 import { Address } from './entities/address.entity';
 import { RouteStop } from '../routes/entities/routeStop.entity';
 import { RouteStatus } from '../routes/entities/route.entity';

@@ -48,6 +48,8 @@ export class ShipmentsController {
   @ApiResponse({ status: 404, description: 'Shipment not found' })
   @ApiParam({ name: 'id', type: String, description: 'Canister shipment ID' })
   @UseGuards(ShipmentGuard)
+  @UseGuards(ShipmentSyncGuard)
+  @Roles(UserRole.SHIPPER)
   async getByCanisterId(@Param('id') id: string) {
     return this.shipmentsService.findOneById(id);
   }
@@ -103,17 +105,53 @@ export class ShipmentsController {
   }
 
   @Get(':id/addresses')
+  @ApiOperation({ summary: 'Get addresses for a shipment' })
+  @ApiResponse({
+    status: 200,
+    type: GeocodeResponseDto,
+    description: 'Returns pickup and delivery addresses',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Shipment ID',
+  })
+  @UseGuards(ShipmentGuard)
+  @UseGuards(ShipmentSyncGuard)
+  @Roles(UserRole.SHIPPER)
   async getAddresses(@Param('id') id: string): Promise<GeocodeResponseDto> {
     return this.shipmentsService.getAddresses(id);
   }
 
   @Get(':id/time-windows')
+  @ApiOperation({
+    summary: 'Get pickup and delivery time windows for a shipment',
+  })
+  @ApiResponse({
+    status: 200,
+    type: ShipmentWindowsDto,
+    description: 'Returns pickup and delivery time windows',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Shipment ID',
+  })
+  @UseGuards(ShipmentGuard)
+  @UseGuards(ShipmentSyncGuard)
+  @Roles(UserRole.SHIPPER)
   async getTimeWindows(@Param('id') id: string): Promise<ShipmentWindowsDto> {
     return this.shipmentsService.getTimeWindows(id);
   }
 
   @Post('geocode')
-  @UseGuards(ShipmentSyncGuard)
+  @ApiOperation({ summary: 'Geocode an address to get coordinates' })
+  @ApiResponse({
+    status: 200,
+    type: GeocodeResponseDto,
+    description: 'Returns geocoded address with coordinates',
+  })
+  @ApiBody({ type: GeocodeAddressDto })
   async geocodeAddress(
     @Body() geocodeAddressDto: GeocodeAddressDto,
   ): Promise<GeocodeResponseDto> {
@@ -124,6 +162,7 @@ export class ShipmentsController {
   @ApiOperation({ summary: 'Get pending shipments for authenticated shipper' })
   @ApiResponse({ status: 200, type: [PendingShipmentResponseDto] })
   @UseGuards(ShipmentSyncGuard)
+  @Roles(UserRole.SHIPPER)
   async getShipperPendingShipments(
     @User() user: IcpUser,
   ): Promise<PendingShipmentResponseDto[]> {
@@ -134,6 +173,7 @@ export class ShipmentsController {
   @ApiOperation({ summary: 'Get bought shipments for authenticated carrier' })
   @ApiResponse({ status: 200, type: [BoughtShipmentResponseDto] })
   @UseGuards(ShipmentSyncGuard)
+  @Roles(UserRole.SHIPPER)
   async getMyBoughtShipments(
     @User() user: IcpUser,
   ): Promise<BoughtShipmentResponseDto[]> {
@@ -144,6 +184,7 @@ export class ShipmentsController {
   @ApiOperation({ summary: 'Get in route shipments for authenticated carrier' })
   @ApiResponse({ status: 200, type: [InTransitShipmentResponseDto] })
   @UseGuards(ShipmentSyncGuard)
+  @Roles(UserRole.SHIPPER)
   async getMyInRouteShipments(
     @User() user: IcpUser,
   ): Promise<InTransitShipmentResponseDto[]> {
@@ -154,6 +195,7 @@ export class ShipmentsController {
   @ApiOperation({ summary: 'Get carried shipments for authenticated carrier' })
   @ApiResponse({ status: 200, type: [BoughtShipmentResponseDto] })
   @UseGuards(ShipmentSyncGuard)
+  @Roles(UserRole.CARRIER)
   async getMyCarriedShipments(
     @User() user: IcpUser,
   ): Promise<CarriedShipmentResponseDto[]> {

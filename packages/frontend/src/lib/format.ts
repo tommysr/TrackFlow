@@ -1,5 +1,5 @@
 export function formatDistance(km: number): string {
-  return `${km.toFixed(1)} km`;
+  return typeof km === 'number' ? `${km.toFixed(1)} km` : `${Number(km).toFixed(1)} km`;
 }
 
 export function formatDuration(minutes: number): string {

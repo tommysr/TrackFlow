@@ -1,7 +1,6 @@
 import { ShipmentStatus } from '../entities/shipment.entity';
 import { AddressLocationResponseDto } from './address-location.dto';
-import { RouteSegmentDto } from './public-shipment-tracking.dto';
-import { LocationDto } from 'src/common/dto/location.dto';
+
 export class BaseShipmentResponseDto {
   canisterShipmentId: string;
   status: ShipmentStatus;

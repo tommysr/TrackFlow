@@ -1,5 +1,11 @@
 import { Controller, Patch, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { CarriersService } from './carriers.service';
 import { UpdateCarrierDto } from './dto/update-carrier.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
@@ -10,37 +16,38 @@ import { Carrier } from './entities/carrier.entity';
 
 @ApiTags('carriers')
 @Controller('carriers')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class CarriersController {
   constructor(private readonly carriersService: CarriersService) {}
 
-  @Patch('/update-fuel-info')
-  @ApiOperation({ 
+  @Patch('/configuration/fuel-info')
+  @ApiOperation({
     summary: 'Update carrier fuel information',
-    description: 'Updates the fuel efficiency and cost information for the authenticated carrier'
+    description:
+      'Updates the fuel efficiency and cost information for the authenticated carrier',
   })
-  @ApiResponse({ 
-    status: 200, 
-    type: Carrier, 
-    description: 'Carrier fuel information updated successfully'
+  @ApiResponse({
+    status: 200,
+    type: Carrier,
+    description: 'Carrier fuel information updated successfully',
   })
-  @ApiResponse({ 
-    status: 404, 
-    description: 'Carrier not found'
+  @ApiResponse({
+    status: 404,
+    description: 'Carrier not found',
   })
-  @ApiResponse({ 
-    status: 403, 
-    description: 'Forbidden - User is not authorized to update this carrier'
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - User is not authorized to update this carrier',
   })
-  @ApiBody({ 
+  @ApiBody({
     type: UpdateCarrierDto,
-    description: 'Fuel efficiency and cost information'
+    description: 'Fuel efficiency and cost information',
   })
   async updateFuelInfo(
     @Body() updateCarrierDto: UpdateCarrierDto,
     @User() user: IcpUser,
-  ): Promise<Carrier> {
+  ): Promise<UpdateCarrierDto> {
     return this.carriersService.updateFuelInfo(updateCarrierDto, user);
   }
-} 
+}

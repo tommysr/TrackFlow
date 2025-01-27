@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { Challenge, ChallengeResponse } from '../types/challenge.types';
+import { Challenge } from '../types/challenge.types';
+import { ChallengeResponseDto } from '../dto/challenge-response.dto';
 
 @Injectable()
 export class ChallengeService {
   private readonly activeChallenges = new Map<string, Challenge>();
   private readonly CHALLENGE_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
-  generateChallenge(): ChallengeResponse {
+  generateChallenge(): ChallengeResponseDto {
     const challenge = randomBytes(32);
     const sessionId = randomBytes(16).toString('hex');
     
