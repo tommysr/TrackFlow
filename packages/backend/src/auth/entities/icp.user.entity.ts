@@ -1,6 +1,4 @@
 import { Entity, Column, PrimaryColumn, OneToOne } from 'typeorm';
-import { Shipper } from './shipper.entity';
-import { Carrier } from 'src/carriers/entities/carrier.entity';
 
 export enum UserRole {
   USER = 'USER',
