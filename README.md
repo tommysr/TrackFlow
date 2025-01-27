@@ -1,99 +1,215 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Logistics Management System
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## Overview
+A comprehensive logistics management system built with NestJS and SvelteKit, providing robust APIs for managing shipments, carriers, routes, and real-time tracking. The system features advanced route optimization, real-time GPS tracking, automated notifications, and integration with Internet Computer (IC) for decentralized authentication and data storage.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Architecture
 
-## Description
+### Overall System Architecture
+The system is composed of three main components that communicate through well-defined interfaces:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+1. **Internet Computer (IC) Canister**
+   - Core business logic and state management
+   - Smart contract implementation for shipment lifecycle
+   - Decentralized authentication and authorization
+   - Event sourcing for shipment state changes
+   - Clear interface with backend through principal-based authentication and event system
 
-## Project setup
+2. **Backend API Service**
+   - REST API for client applications
+   - Real-time updates through WebSocket connections
+   - Integration layer between IC and client applications
+   - Route optimization and tracking logic
+   - Event processing and synchronization with IC
 
+3. **Mailer Service**
+   - Independent microservice for email handling
+   - Consumes events through RabbitMQ
+   - Handles notification templates and delivery
+   - Provides delivery status tracking
+
+The components interact through:
+- HTTP between frontend and backend and IC and backend
+- Principal-based authentication with IC (frontend - backend, frontend - smart contract)
+- Message queues for asynchronous communication (backend - mailer)
+- Event-based synchronization for state management (backend - smart contract)
+
+### Backend API Architecture
+The backend API follows a traditional monolithic NestJS structure, chosen for:
+- Rapid development
+- Easier debugging
+- Business logic changes
+
+Current organization:
+
+1. **Domain Modules**
+   - **Auth**: Handles IC authentication synchronization and JWT management
+   - **Shipments**: Processes shipment events from IC and manages local state
+   - **Carriers**: Handles carrier profiles and vehicle management
+   - **Routes**: Implements route optimization and tracking logic
+
+2. **Infrastructure**
+   - **Core Services**: Cross-cutting concerns and shared utilities
+   - **Notifications**: Event dispatch to mailer service
+   - **Database**: PostgreSQL with PostGIS for spatial data
+   - **External APIs**: OpenRouteService integration
+
+While currently monolithic, this structure was chosen to:
+- Focus on business logic implementation
+- Establish clear integration patterns with IC, how to sync and handle data to have single source of truth
+- Enable rapid iterations and adjustments between unknown technologies 
+
+Future improvements planned:
+- Better module boundaries through domain events
+- Reduction of circular dependencies
+- Clear interfaces between modules
+- Potential split into microservices if needed
+
+### Frontend (SvelteKit)
+A modern web application providing:
+- Real-time shipment tracking interface
+- Carrier and shipper dashboards
+- Route visualization with MapLibre
+- Responsive design using TailwindCSS
+
+## Features
+
+### Shipment Management
+- Create and track shipments
+- Real-time location updates
+- Address geocoding and validation
+- Time window management for pickups/deliveries
+- Status tracking (PENDING, BOUGHT, ROUTE_SET, PICKED_UP, IN_DELIVERY, DELIVERED)
+- Public tracking links for customers
+
+### Route Optimization
+- Advanced route optimization using OpenRouteService
+- Real-time route tracking and updates
+- ETA calculations and delay detection
+- Multi-stop route planning
+- Fuel consumption estimation
+
+### Carrier Management
+- Carrier registration and profile management
+- Vehicle configuration
+- Fuel efficiency tracking
+- Real-time location updates
+- Route assignment and management
+
+### Authentication & Authorization
+- Internet Computer (IC) integration for decentralized auth
+- Role-based access control (USER, ADMIN, SHIPPER, CARRIER)
+- Secure session management
+- Challenge-based authentication flow
+
+### Real-time Notifications
+- Email notifications for important events
+- RabbitMQ integration for reliable message delivery
+- Configurable notification templates
+- Event-driven updates
+
+## Technology Stack
+
+### Backend
+- **NestJS**: Main application framework
+- **TypeORM**: Database ORM with PostgreSQL
+- **PostGIS**: Spatial database extension
+- **RabbitMQ**: Message queue for notifications
+- **OpenRouteService**: Route optimization and geocoding
+- **Internet Computer**: Decentralized authentication and smart contracts
+- **Node.js**: Runtime environment
+
+### Frontend
+- **SvelteKit**: Frontend framework
+- **MapLibre**: Mapping and visualization
+- **TailwindCSS**: Styling
+
+### DevOps & Tools
+- **Docker & Docker Compose**: Containerization
+- **TypeScript**: Programming language
+- **Swagger**: API documentation
+
+## Database Design
+
+### Key Tables
+
+#### Users & Authentication
+- **IcpUser**: Stores user information and roles
+- **Shipper**: Links to ICP users with shipper role
+- **Carrier**: Stores carrier information and configuration
+
+#### Shipment Management
+- **Shipment**: Core shipment information
+  - Links to shipper and carrier
+  - Tracks status and timeline
+  - Stores value and price
+  - Contains pickup/delivery windows
+- **Address**: Stores geocoded addresses
+  - Used for both pickup and delivery locations
+  - Contains coordinates and address details
+
+#### Route Management
+- **Route**: Stores route information
+  - Links to carrier
+  - Contains path geometry
+  - Tracks status and progress
+- **RouteStop**: Individual stops in a route
+  - Links to shipments
+  - Contains arrival times and status
+- **RouteSegment**: Path segments between stops
+  - Contains distance and duration
+  - Stores path geometry
+- **RouteMetrics**: Performance metrics
+  - Tracks completed/total stops
+  - Monitors delays and progress
+- **RouteDelay**: Records and tracks delays
+  - Stores location and timing information
+  - Contains delay reasons and updates
+
+### ERD Diagram
+[Place for ERD Diagram]
+
+## Getting Started
+
+### Prerequisites
+- Node.js ≥ 16.0.0
+- PostgreSQL with PostGIS extension
+- RabbitMQ
+- Internet Computer SDK (DFX)
+- Docker (optional)
+
+### Installation
+
+1. Clone the repository
+2. Copy environment configuration:
 ```bash
-$ npm install
+cp .env.example .env
 ```
 
-## Compile and run the project
-
+3. Start required services:
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+docker-compose up -d
 ```
 
-## Run tests
-
+4. Start local Internet Computer replica:
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+dfx start --clean --background
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
+5. Deploy canisters:
 ```bash
-$ npm install -g mau
-$ mau deploy
+dfx deploy
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+6. Run backend (development):
+```bash
+bun backend
+```
 
-## Resources
+7. Run frontend (development):
+```bash
+bun frontend
+```
 
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## API Documentation
+API documentation is available at `/api/docs` when running the backend server, powered by Swagger/OpenAPI.
