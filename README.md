@@ -175,7 +175,7 @@ A modern web application providing:
   - Contains delay reasons and updates
 
 ### ERD Diagram
-[Place for ERD Diagram]
+![ERD Diagram](erd.png)
 
 ## Getting Started
 

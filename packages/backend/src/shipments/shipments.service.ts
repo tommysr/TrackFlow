@@ -296,7 +296,7 @@ export class ShipmentsService {
         ...this.toPendingShipmentResponseDto(shipment),
         assignedCarrier: shipment.carrier
           ? {
-              name: shipment.carrier.user.name ?? 'Carrier',
+              name: shipment.carrier.user.name ?? 'Unknown',
               principal: shipment.carrier.principal,
             }
           : null,
@@ -413,7 +413,7 @@ export class ShipmentsService {
         ...this.toPendingShipmentResponseDto(shipment),
         assignedCarrier: shipment.carrier
           ? {
-              name: shipment.carrier.user.name ?? 'Carrier',
+              name: shipment.carrier.user.name ?? 'Unknown',
               principal: shipment.carrier.principal,
             }
           : null,
@@ -474,7 +474,7 @@ export class ShipmentsService {
           status: shipment.status,
           estimatedPickupDate: undefined,
           estimatedDeliveryDate: undefined,
-          carrierName: shipment.carrier?.user?.name ?? 'Carrier',
+          carrierName: shipment.carrier?.user?.name,
           currentLocation: undefined,
           lastUpdate: undefined,
           remainingDistance: 0,
@@ -497,7 +497,7 @@ export class ShipmentsService {
           status: shipment.status,
           estimatedPickupDate: undefined,
           estimatedDeliveryDate: undefined,
-          carrierName: shipment.carrier?.user?.name ?? 'Carrier',
+          carrierName: shipment.carrier?.user?.name,
           currentLocation: undefined,
           lastUpdate: undefined,
           remainingDistance: 0,
@@ -529,7 +529,7 @@ export class ShipmentsService {
         status: shipment.status,
         estimatedPickupDate: pickupStop?.estimatedArrival,
         estimatedDeliveryDate: deliveryStop?.estimatedArrival,
-        carrierName: shipment.carrier?.user?.name ?? 'Carrier',
+        carrierName: shipment.carrier?.user?.name,
         currentLocation,
         lastUpdate: route.lastLocationUpdate,
         remainingDistance: trackingInfo?.remainingDistance ?? 0,
