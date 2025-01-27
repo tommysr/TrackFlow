@@ -6,6 +6,8 @@ import {
   Param,
   Body,
   UseGuards,
+  Query,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ShipmentsService } from './shipments.service';
 import { ShipmentGuard } from '../auth/guards/shipment.guard';
@@ -24,6 +26,8 @@ import { ShipmentWindowsDto } from './dto/time-window.dto';
 import { SetStopDateDto } from './dto/set-stop-date.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
 import { Shipment } from './entities/shipment.entity';
+import { PublicShipmentTrackingDto } from './dto/public-shipment-tracking.dto';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('shipments')
 @Controller('shipments')
@@ -134,5 +138,16 @@ export class ShipmentsController {
     @User() user: IcpUser,
   ): Promise<BoughtShipmentResponseDto[]> {
     return this.shipmentsService.findCarriedShipments(user.principal);
+  }
+
+  @Public()
+  @Get('tracking')
+  async getPublicTracking(
+    @Query('token') token: string
+  ): Promise<PublicShipmentTrackingDto> {
+    if (!token) {
+      throw new UnauthorizedException('Tracking token is required');
+    }
+    return this.shipmentsService.getPublicTracking(token);
   }
 }
