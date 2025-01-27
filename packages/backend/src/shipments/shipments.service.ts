@@ -12,6 +12,7 @@ import {
   BaseShipmentResponseDto,
   BoughtShipmentResponseDto,
   GeocodeResponseDto,
+  InTransitShipmentResponseDto,
   PendingShipmentResponseDto,
 } from './dto/shipment-response.dto';
 import { ShipmentsSyncService } from './shipments-sync.service';
@@ -35,7 +36,6 @@ export class ShipmentsService {
   constructor(
     @InjectRepository(Shipment)
     private readonly shipmentRepository: Repository<Shipment>,
-    private readonly syncService: ShipmentsSyncService,
     private readonly configService: ConfigService,
     @InjectRepository(Address)
     private readonly addressRepository: Repository<Address>,
@@ -191,10 +191,6 @@ export class ShipmentsService {
     return jwt.sign(payload, this.configService.get('TRACKING_TOKEN_SECRET'));
   }
 
-  async findByHashedSecret(hashedSecret: string): Promise<Shipment | null> {
-    return this.shipmentRepository.findOne({ where: { hashedSecret } });
-  }
-
   private toBaseShipmentResponseDto(
     shipment: Shipment,
   ): BaseShipmentResponseDto {
@@ -256,10 +252,45 @@ export class ShipmentsService {
   async findBoughtShipments(
     principal: string,
   ): Promise<BoughtShipmentResponseDto[]> {
+    // Get all route stops with their shipments for this shipper
+    const routeStops = await this.routeStopRepo.find({
+      where: {
+        shipment: {
+          shipper: { principal },
+        },
+        route: {
+          status: In([RouteStatus.ACTIVE]),
+        },
+        stopType: In(['PICKUP', 'DELIVERY']),
+      },
+      relations: ['shipment', 'route'],
+    });
+
+    // Group stops by shipment ID
+    const stopsByShipmentId = new Map<string, RouteStop[]>();
+    const shipmentsInActiveRoutes = new Set<string>();
+
+    routeStops.forEach((stop) => {
+      if (!stop.shipment) return;
+
+      // Track shipments in active routes
+      if (stop.route.status === RouteStatus.ACTIVE) {
+        shipmentsInActiveRoutes.add(stop.shipment.canisterShipmentId);
+      }
+
+      // Group stops by shipment ID
+      if (!stopsByShipmentId.has(stop.shipment.canisterShipmentId)) {
+        stopsByShipmentId.set(stop.shipment.canisterShipmentId, []);
+      }
+      stopsByShipmentId.get(stop.shipment.canisterShipmentId).push(stop);
+    });
+
+    // Get shipments that are bought but not in active routes
     const shipments = await this.shipmentRepository.find({
       where: {
         shipper: { principal },
         status: In([ShipmentStatus.BOUGHT, ShipmentStatus.ROUTE_SET]),
+        canisterShipmentId: Not(In([...shipmentsInActiveRoutes])),
       },
       relations: [
         'shipper',
@@ -270,27 +301,10 @@ export class ShipmentsService {
       ],
     });
 
-    // Get all route stops for these shipments
-    const stops = await this.routeStopRepo.find({
-      where: {
-        shipmentId: In(shipments.map((s) => s.id)),
-        route: {
-          status: Not(In([RouteStatus.COMPLETED, RouteStatus.CANCELLED])),
-        },
-        stopType: In(['PICKUP', 'DELIVERY']),
-      },
-      relations: ['shipment'],
-    });
-
     return shipments.map((shipment) => {
-      // Find pickup and delivery stops for this shipment
-      const pickupStop = stops.find(
-        (stop) => stop.shipmentId === shipment.id && stop.stopType === 'PICKUP',
-      );
-      const deliveryStop = stops.find(
-        (stop) =>
-          stop.shipmentId === shipment.id && stop.stopType === 'DELIVERY',
-      );
+      const stops = stopsByShipmentId.get(shipment.canisterShipmentId) || [];
+      const pickupStop = stops.find((stop) => stop.stopType === 'PICKUP');
+      const deliveryStop = stops.find((stop) => stop.stopType === 'DELIVERY');
 
       return {
         ...this.toPendingShipmentResponseDto(shipment),
@@ -437,6 +451,83 @@ export class ShipmentsService {
     });
   }
 
+  async findInRouteShipments(
+    shipperId: string,
+  ): Promise<InTransitShipmentResponseDto[]> {
+    // Get all route stops with their shipments for active routes
+    const routeStops = await this.routeStopRepo.find({
+      where: {
+        shipment: {
+          shipper: { principal: shipperId },
+        },
+        route: {
+          status: In([RouteStatus.ACTIVE, RouteStatus.COMPLETED]),
+        },
+        stopType: In(['PICKUP', 'DELIVERY']),
+      },
+      relations: [
+        'shipment',
+        'route',
+        'shipment.carrier',
+        'shipment.carrier.user',
+        'shipment.pickupAddress',
+        'shipment.deliveryAddress',
+      ],
+    });
+
+    if (!routeStops.length) {
+      return [];
+    }
+
+    // Group stops by shipment and create a set of unique shipments
+    const stopsByShipmentId = new Map<string, RouteStop[]>();
+    const uniqueShipments = new Set<Shipment>();
+
+    routeStops.forEach((stop) => {
+      if (!stop.shipment) return;
+
+      if (!stopsByShipmentId.has(stop.shipment.canisterShipmentId)) {
+        stopsByShipmentId.set(stop.shipment.canisterShipmentId, []);
+        uniqueShipments.add(stop.shipment);
+      }
+      stopsByShipmentId.get(stop.shipment.canisterShipmentId).push(stop);
+    });
+
+    return Array.from(uniqueShipments).map((shipment: Shipment) => {
+      const stops = stopsByShipmentId.get(shipment.canisterShipmentId);
+      const pickupStop = stops.find((stop) => stop.stopType === 'PICKUP');
+      const deliveryStop = stops.find((stop) => stop.stopType === 'DELIVERY');
+
+      return {
+        ...this.toPendingShipmentResponseDto(shipment),
+        assignedCarrier: shipment.carrier
+          ? {
+              name: shipment.carrier.user.name ?? 'Unknown',
+              principal: shipment.carrier.principal,
+            }
+          : null,
+        actualPickupDate: pickupStop?.actualArrival,
+        actualDeliveryDate: deliveryStop?.actualArrival,
+        estimatedPickupDate: pickupStop?.estimatedArrival,
+        estimatedDeliveryDate: deliveryStop?.estimatedArrival,
+        pickupTimeWindow:
+          shipment.pickupWindowStart && shipment.pickupWindowEnd
+            ? {
+                start: shipment.pickupWindowStart,
+                end: shipment.pickupWindowEnd,
+              }
+            : undefined,
+        deliveryTimeWindow:
+          shipment.deliveryWindowStart && shipment.deliveryWindowEnd
+            ? {
+                start: shipment.deliveryWindowStart,
+                end: shipment.deliveryWindowEnd,
+              }
+            : undefined,
+      };
+    });
+  }
+
   async getPublicTracking(
     trackingToken: string,
   ): Promise<PublicShipmentTrackingDto> {
@@ -446,7 +537,6 @@ export class ShipmentsService {
         trackingToken,
         this.configService.get('TRACKING_TOKEN_SECRET'),
       ) as { shipmentId: string };
-
 
       const shipment = await this.shipmentRepository.findOne({
         where: { canisterShipmentId: decoded.shipmentId },
@@ -477,8 +567,6 @@ export class ShipmentsService {
           carrierName: shipment.carrier?.user?.name,
           currentLocation: undefined,
           lastUpdate: undefined,
-          remainingDistance: 0,
-          remainingDuration: 0,
           isPickupPhase: true,
           isNearby: false,
         };
@@ -500,8 +588,6 @@ export class ShipmentsService {
           carrierName: shipment.carrier?.user?.name,
           currentLocation: undefined,
           lastUpdate: undefined,
-          remainingDistance: 0,
-          remainingDuration: 0,
           isPickupPhase: true,
           isNearby: false,
         };
@@ -523,7 +609,9 @@ export class ShipmentsService {
 
       // Get the relevant address based on the phase
       const isPickupPhase = trackingInfo?.isPickupRoute ?? true;
-      const relevantAddress = isPickupPhase ? shipment.pickupAddress : shipment.deliveryAddress;
+      const relevantAddress = isPickupPhase
+        ? shipment.pickupAddress
+        : shipment.deliveryAddress;
 
       return {
         status: shipment.status,
@@ -532,8 +620,6 @@ export class ShipmentsService {
         carrierName: shipment.carrier?.user?.name,
         currentLocation,
         lastUpdate: route.lastLocationUpdate,
-        remainingDistance: trackingInfo?.remainingDistance ?? 0,
-        remainingDuration: trackingInfo?.remainingDuration ?? 0,
         isPickupPhase: trackingInfo?.isPickupRoute ?? true,
         isNearby: trackingInfo?.isNearby ?? false,
         activeSegment: trackingInfo?.segment
@@ -544,8 +630,14 @@ export class ShipmentsService {
               })),
             }
           : undefined,
-        pickup: isPickupPhase && relevantAddress ? this.toAddressResponse(relevantAddress) : undefined,
-        delivery: !isPickupPhase && relevantAddress ? this.toAddressResponse(relevantAddress) : undefined
+        pickup:
+          isPickupPhase && relevantAddress
+            ? this.toAddressResponse(relevantAddress)
+            : undefined,
+        delivery:
+          !isPickupPhase && relevantAddress
+            ? this.toAddressResponse(relevantAddress)
+            : undefined,
       };
     } catch (error) {
       if (

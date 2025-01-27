@@ -508,6 +508,7 @@
 <!-- Add the confirmation dialog -->
 {#if confirmingDelivery}
   <DeliveryConfirmation
+    routeId={route.id}
     stop={confirmingDelivery}
     onClose={() => (confirmingDelivery = null)}
     onConfirmed={handleDeliveryConfirmed}

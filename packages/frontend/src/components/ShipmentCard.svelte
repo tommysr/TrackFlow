@@ -8,7 +8,8 @@
     type InTransitShipment,
     type PendingShipment,
   } from '$lib/extended.shipment';
-  import { formatDistance } from 'date-fns';
+    import clsx from 'clsx';
+
   import type { Snippet } from 'svelte';
 
   let {
@@ -32,6 +33,11 @@
     const today = new Date();
     return date.toDateString() === today.toDateString();
   });
+
+  function formatDateTime(date: Date | undefined): string {
+    if (!date) return 'Not set';
+    return new Date(date).toLocaleString();
+  }
 
   const formatLocation = (addressLocation: AddressLocationResponse) => {
     return `${addressLocation.address?.street}, ${addressLocation.address?.city}`;
@@ -93,7 +99,39 @@
     </div>
   </div>
 
-  {#if isBoughtShipment(shipment) && cardType === 'shipper'}
+  {#if isInTransitShipment(shipment) && cardType === 'shipper'}
+    {@const pickupDifference = shipment.actualPickupDate && shipment.estimatedPickupDate ? new Date(shipment.actualPickupDate).getTime() - new Date(shipment.estimatedPickupDate).getTime() : 0}
+    {@const deliveryDifference = shipment.actualDeliveryDate && shipment.estimatedDeliveryDate ? new Date(shipment.actualDeliveryDate).getTime() - new Date(shipment.estimatedDeliveryDate).getTime() : 0}
+    <div class="space-y-2">
+      {#if shipment.actualPickupDate}
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-500"> Actual Pickup</span>
+          <span class={pickupDifference > 0 ? 'text-red-500' : 'text-green-500'}>({Math.floor(pickupDifference / (1000 * 60))} min) {formatDateTime(shipment.actualPickupDate)} </span>
+        </div>
+      {/if}
+
+      {#if shipment.actualDeliveryDate}
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-500">Actual Delivery</span>
+          <span class={deliveryDifference > 0 ? 'text-red-500' : 'text-green-500'}>({Math.floor(deliveryDifference / (1000 * 60))} min) {formatDateTime(shipment.actualDeliveryDate)} </span>
+        </div>
+      {/if}
+
+      {#if shipment.estimatedPickupDate}
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-500">Estimated Pickup</span>
+          <span>{formatDateTime(new Date(shipment.estimatedPickupDate))}</span>
+        </div>
+      {/if}
+
+      {#if shipment.estimatedDeliveryDate}
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-500">Estimated Delivery</span>
+          <span>{formatDateTime(new Date(shipment.estimatedDeliveryDate))}</span>
+        </div>
+      {/if}
+    </div>
+  {:else if isBoughtShipment(shipment) && cardType === 'shipper'}
     <div class="space-y-2">
       <div class="flex justify-between">
         <span class="text-sm text-gray-500">Estimated Pickup</span>
@@ -101,8 +139,9 @@
           {@const pickupDate = new Date(shipment.estimatedPickupDate)}
           <span class={isToday(pickupDate) ? 'text-green-500' : ''}>
             {pickupDate.toLocaleString()}
-            
           </span>
+        {:else}
+          <span class="text-gray-500">Route not yet created</span>
         {/if}
       </div>
       <div class="flex justify-between">
@@ -110,42 +149,12 @@
         {#if shipment.estimatedDeliveryDate}
           {@const deliveryDate = new Date(shipment.estimatedDeliveryDate)}
           <span class={isToday(deliveryDate) ? 'text-green-500' : ''}>
-            {deliveryDate.toLocaleString  ()}
-          
+            {deliveryDate.toLocaleString()}
           </span>
+        {:else}
+          <span class="text-gray-500">Route not yet created</span>
         {/if}
       </div>
-    </div>
-  {/if}
-
-  {#if isInTransitShipment(shipment)}
-    <div class="space-y-2">
-      {#if shipment.lastUpdate}
-        <div class="flex justify-between">
-          <span class="text-sm text-gray-500">Last Update</span>
-          <span
-            >{formatDistance(shipment.lastUpdate, new Date(), {
-              addSuffix: true,
-            })}</span
-          >
-        </div>
-      {/if}
-      {#if shipment.eta}
-        <div class="flex justify-between">
-          <span class="text-sm text-gray-500">ETA</span>
-          <span>{shipment.eta} minutes</span>
-        </div>
-      {/if}
-      {#if shipment.currentLocation}
-        <div class="flex justify-between">
-          <span class="text-sm text-gray-500">Current Location</span>
-          <span>
-            {shipment.currentLocation.lat.toFixed(4)}, {shipment.currentLocation.lng.toFixed(
-              4,
-            )}
-          </span>
-        </div>
-      {/if}
     </div>
   {/if}
 

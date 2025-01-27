@@ -375,10 +375,11 @@
       }
     } catch (error) {
       // Show error in UI
-      const errorMessage = error instanceof Error ? error.message : 'Failed to activate route';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to activate route';
 
       activationError = errorMessage;
-      
+
       // Add error display in the template near the Activate button:
       console.error('Failed to activate route:', error);
     }
@@ -510,7 +511,7 @@
   function updateValidOperations() {
     const routeDay = scheduledDate ? startOfDay(new Date(scheduledDate)) : null;
     console.log('Route day:', routeDay);
-    
+
     // Create new maps for validation
     const newValidOps = new Map();
     const newShipmentOps = new Map(shipmentOperations);
@@ -525,7 +526,10 @@
       // Only validate and potentially deselect if date is selected
       if (routeDay && newSelectedShipments.has(shipment.id.toString())) {
         const currentOp = newShipmentOps.get(shipment.id.toString());
-        const opKey = currentOp?.toLowerCase() as 'pickup' | 'delivery' | 'both';
+        const opKey = currentOp?.toLowerCase() as
+          | 'pickup'
+          | 'delivery'
+          | 'both';
         if (currentOp && !validOps[opKey]) {
           newSelectedShipments.delete(shipment.id.toString());
           newShipmentOps.delete(shipment.id.toString());
@@ -549,7 +553,8 @@
 
   $effect(() => {
     console.log('Selected nav changed:', selectedNav);
-    if (selectedNav === 0) { // Only validate in Available tab
+    if (selectedNav === 0) {
+      // Only validate in Available tab
       updateValidOperations();
     }
   });
@@ -796,10 +801,14 @@
 
                       <!-- Add scheduling availability message -->
                       {#if scheduledDate}
-                        {@const validOps = validOperationsMap.get(String(shipment.id))}
+                        {@const validOps = validOperationsMap.get(
+                          String(shipment.id),
+                        )}
                         {#if validOps && !validOps.pickup && !validOps.delivery && !validOps.both}
                           <p class="mt-1 text-xs text-red-500">
-                            Cannot schedule for {new Date(scheduledDate).toISOString()} - outside of time windows
+                            Cannot schedule for {new Date(
+                              scheduledDate,
+                            ).toISOString()} - outside of time windows
                           </p>
                         {/if}
                       {/if}
@@ -901,9 +910,9 @@
             <div class="text-center">Loading routes...</div>
           </div>
         {:else if activeRoute}
-        <div
-        class="flex-1 flex w-full flex-col overflow-y-auto px-4 py-2 space-y-4"
-      >
+          <div
+            class="flex-1 flex w-full flex-col overflow-y-auto px-4 py-2 space-y-4"
+          >
             <ActiveRoute route={activeRoute} />
           </div>
         {:else if routes.length === 0}
@@ -940,21 +949,20 @@
                 class="bg-white rounded-lg shadow p-4 space-y-3 hover:ring-2 hover:ring-blue-200"
               >
                 <div class="flex justify-between items-center">
-                  <div class="flex items-center gap-2">
-                    <h3 class="text-lg font-semibold">
-                      Route #{route.route.id.slice(0, 8)}
-                    </h3>
-                    <span
-                      class="px-2 py-1 text-sm rounded-full {route.route
-                        .status === RouteStatus.PENDING
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : route.route.status === RouteStatus.COMPLETED
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-red-100 text-red-800'}"
-                    >
-                      {route.route.status}
-                    </span>
-                  </div>
+                  <h3 class="text-lg font-semibold">
+                    Route #{route.route.id.slice(0, 8)}
+                  </h3>
+                  <span
+                    class="px-2 py-1 text-sm rounded-full {route.route
+                      .status === RouteStatus.PENDING
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : route.route.status === RouteStatus.COMPLETED
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-red-100 text-red-800'}"
+                  >
+                    {route.route.status}
+                  </span>
+
                   {#if route.route.status === RouteStatus.PENDING}
                     <span
                       class="{canActivate
@@ -999,10 +1007,11 @@
                 <div class="flex gap-2 flex-col">
                   {#if route.route.status === RouteStatus.PENDING}
                     <button
-                      class="px-3 py-1 text-white rounded {canActivate 
+                      class="px-3 py-1 text-white rounded {canActivate
                         ? 'bg-gradient-to-r from-primary-400 to-secondary-400 hover:from-primary-500 hover:to-secondary-500'
                         : 'bg-gray-400 cursor-not-allowed'}"
-                      onclick={() => canActivate && activateRoute(route.route.id)}
+                      onclick={() =>
+                        canActivate && activateRoute(route.route.id)}
                       disabled={!canActivate}
                       title={!canActivate
                         ? 'Route cannot be activated - outside of time windows'

@@ -218,7 +218,6 @@ export class ShipmentsSyncService {
           value: Number(canisterShipment.info.value),
           price: Number(canisterShipment.info.price),
           size: this.getSizeCategory(canisterShipment.info.size_category),
-          hashedSecret: canisterShipment.hashed_secret.toString(),
         });
       }
 

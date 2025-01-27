@@ -8,7 +8,7 @@ export type BackendStatus =
   | 'BOUGHT'
   | 'ROUTE_SET'
   | 'PICKED_UP'
-  | 'IN_TRANSIT'
+  | 'IN_DELIVERY'
   | 'DELIVERED'
   | 'CANCELLED';
 
@@ -65,10 +65,8 @@ export interface BoughtShipmentResponse extends PendingShipmentResponse {
 
 // In transit shipments
 export interface InTransitShipmentResponse extends BoughtShipmentResponse {
-  currentLocation?: LocationResponse;
-  lastUpdate?: Date;
-  eta?: number;
-  routeSegment?: LocationResponse[];
+  actualPickupDate?: Date;
+  actualDeliveryDate?: Date;
 }
 
 // CONCATENATING SHIPMENT RESPONSE WITH ICP SHIPMENT
@@ -115,8 +113,9 @@ export function isInTransitShipment(
   shipment: PendingShipment | BoughtShipment | InTransitShipment,
 ): shipment is InTransitShipment {
   return (
-    (shipment as InTransitShipment).status === 'IN_TRANSIT' ||
-    shipment.status === 'PICKED_UP'
+    (shipment as InTransitShipment).status === 'IN_DELIVERY' ||
+    (shipment as InTransitShipment).status === 'DELIVERED' ||
+    (shipment as InTransitShipment).status === 'PICKED_UP'
   );
 }
 

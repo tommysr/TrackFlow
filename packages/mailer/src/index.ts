@@ -11,6 +11,11 @@ interface EmailMessage {
   html?: string;
 }
 
+
+
+
+
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || '587'),
@@ -31,7 +36,11 @@ async function connectQueue() {
     await channel.assertQueue('shipment-notifications', { durable: true });
 
     console.log('Connected to RabbitMQ');
-
+    console.log(process.env.SMTP_HOST);
+    console.log(process.env.SMTP_PORT);
+    console.log(process.env.SMTP_USER);
+    console.log(process.env.SMTP_PASS);
+    
     // Process route notifications
     channel.consume('route-notifications', async (data) => {
       if (data) {

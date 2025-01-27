@@ -297,7 +297,7 @@
         class="bg-gradient-to-r from-blue-500 to-rose-400 rounded-full px-7 py-2 w-3/5 mx-auto text-white text-base transition ease-in-out hover:-translate-y-0.5 hover:scale-105 duration-200"
         onclick={continueWithShipment}
       >
-        I've saved the secret, continue
+        I've saved the secret
       </button>
     </div>
   </Modal>

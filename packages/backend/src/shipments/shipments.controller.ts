@@ -17,14 +17,21 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { User } from 'src/auth/decorators/user.decorator';
 import {
   BoughtShipmentResponseDto,
+  CarriedShipmentResponseDto,
   GeocodeResponseDto,
+  InTransitShipmentResponseDto,
   PendingShipmentResponseDto,
 } from './dto/shipment-response.dto';
 import { GeocodeAddressDto, SetAddressDto } from './dto/create-shipment.dto';
 import { ShipmentSyncGuard } from 'src/auth/guards/shipment.sync.guard';
 import { ShipmentWindowsDto } from './dto/time-window.dto';
-import { SetStopDateDto } from './dto/set-stop-date.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
 import { Shipment } from './entities/shipment.entity';
 import { PublicShipmentTrackingDto } from './dto/public-shipment-tracking.dto';
 import { Public } from '../auth/decorators/public.decorator';
@@ -79,7 +86,10 @@ export class ShipmentsController {
   // Set time windows
   @Put(':id/time-windows')
   @ApiOperation({ summary: 'Set shipment time windows' })
-  @ApiResponse({ status: 200, description: 'Time windows updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Time windows updated successfully',
+  })
   @ApiParam({ name: 'id', type: String, description: 'Shipment ID' })
   @ApiBody({ type: ShipmentWindowsDto })
   @UseGuards(ShipmentGuard)
@@ -130,20 +140,30 @@ export class ShipmentsController {
     return this.shipmentsService.findBoughtShipments(user.principal);
   }
 
+  @Get('my-in-route')
+  @ApiOperation({ summary: 'Get in route shipments for authenticated carrier' })
+  @ApiResponse({ status: 200, type: [InTransitShipmentResponseDto] })
+  @UseGuards(ShipmentSyncGuard)
+  async getMyInRouteShipments(
+    @User() user: IcpUser,
+  ): Promise<InTransitShipmentResponseDto[]> {
+    return this.shipmentsService.findInRouteShipments(user.principal);
+  }
+
   @Get('my-carried')
   @ApiOperation({ summary: 'Get carried shipments for authenticated carrier' })
   @ApiResponse({ status: 200, type: [BoughtShipmentResponseDto] })
   @UseGuards(ShipmentSyncGuard)
   async getMyCarriedShipments(
     @User() user: IcpUser,
-  ): Promise<BoughtShipmentResponseDto[]> {
+  ): Promise<CarriedShipmentResponseDto[]> {
     return this.shipmentsService.findCarriedShipments(user.principal);
   }
 
   @Public()
   @Get('tracking')
   async getPublicTracking(
-    @Query('token') token: string
+    @Query('token') token: string,
   ): Promise<PublicShipmentTrackingDto> {
     if (!token) {
       throw new UnauthorizedException('Tracking token is required');

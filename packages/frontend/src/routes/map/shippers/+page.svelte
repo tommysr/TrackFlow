@@ -128,20 +128,10 @@
                     {#if isInTransitShipment(shipment)}
                       <!-- In Transit Shipment Info -->
                       <div class="flex flex-col gap-2">
+                     
                         <p>Carrier: {shipment.assignedCarrier.name}</p>
                         <p>Status: {shipment.status}</p>
-                        {#if shipment.estimatedDeliveryDate}
-                          <p>
-                            Estimated Delivery: {formatDateTime(
-                              new Date(shipment.estimatedDeliveryDate),
-                            )}
-                          </p>
-                        {/if}
-                        {#if shipment.lastUpdate}
-                          <p>
-                            Last Updated: {formatDateTime(shipment.lastUpdate)}
-                          </p>
-                        {/if}
+                       
                         <button
                           class="bg-gradient-to-r from-blue-500 to-rose-400 text-white px-4 py-2 rounded-full"
                           onclick={() => copyTrackingLink(shipment)}

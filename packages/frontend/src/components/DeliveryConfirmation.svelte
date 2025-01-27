@@ -1,14 +1,23 @@
 <script lang="ts">
   import { authenticatedFetch } from '$lib/canisters';
-  import { ShipmentStatus, type RouteStop, type Shipment } from '$lib/types/route.types';
+  import {
+    ShipmentStatus,
+    type RouteStop,
+    type Shipment,
+  } from '$lib/types/route.types';
   import { wallet } from '$src/lib/wallet.svelte';
 
   let {
+    routeId,
     stop,
     onClose,
     onConfirmed,
-  }: { stop: RouteStop; onClose: () => void; onConfirmed: () => void } =
-    $props();
+  }: {
+    routeId: string;
+    stop: RouteStop;
+    onClose: () => void;
+    onConfirmed: () => void;
+  } = $props();
 
   let secretKey = $state('');
   let isSubmitting = $state(false);
@@ -24,7 +33,7 @@
         'http://localhost:5000/routes/check-delivery',
         {
           method: 'POST',
-          body: JSON.stringify({ shipmentId: stop.shipmentId }),
+          body: JSON.stringify({ shipmentId: stop.shipmentId, routeId }),
         },
       );
 
@@ -40,7 +49,8 @@
         onConfirmed();
       }
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to check delivery status';
+      error =
+        e instanceof Error ? e.message : 'Failed to check delivery status';
     } finally {
       isSubmitting = false;
     }
@@ -71,7 +81,6 @@
         BigInt(stop.shipment.canisterShipmentId),
         [secretKey],
       );
-
       if ('Err' in res) {
         error = `${res.Err}`;
         console.error(res.Err);

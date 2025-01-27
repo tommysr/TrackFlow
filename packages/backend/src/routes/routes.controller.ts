@@ -190,13 +190,14 @@ export class RoutesController {
   @ApiOperation({ summary: 'Check delivery status and update route data' })
   @UseGuards(ShipmentSyncGuard) // First sync ICP events
   async checkAndUpdateDelivery(
-    @Body() data: { shipmentId: string },
+    @Body() data: { routeId: string; shipmentId: string },
   ): Promise<{
     updatedStop?: RouteStop;
     updatedShipment?: Shipment;
     wasUpdated: boolean;
   }> {
     const result = await this.routeTrackingService.checkAndUpdateDeliveryStop(
+      data.routeId,
       data.shipmentId,
     );
 
