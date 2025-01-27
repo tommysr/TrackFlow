@@ -83,9 +83,12 @@ const configFactory = () => {
           password: configService.get('database.password'),
           database: configService.get('database.databaseName'),
           autoLoadEntities: true,
-          synchronize: process.env.NODE_ENV == 'test',
-          migrationsRun: true,
+          synchronize: false, // manual migrations
+          migrationsRun: false, // manual migrations
           migrations: [__dirname + '/migrations/*.{js,ts}'],
+          cli: {
+            migrationsDir: __dirname + '/migrations/',
+          }
         };
       },
       inject: [ConfigService],

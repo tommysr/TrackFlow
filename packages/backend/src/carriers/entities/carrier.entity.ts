@@ -1,9 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, OneToOne, JoinColumn, PrimaryColumn } from 'typeorm';
 // import { `Route } from '../../aggregation/entities/route.entity';
-import { IcpUser } from 'src/auth/entities/icp.user.entity';
-import { Shipment } from 'src/shipments/entities/shipment.entity';
-import { Route } from 'src/routes/entities/route.entity';
-import { CarrierConfiguration } from 'src/carriers/entities/carrier-configuration.entity';
+import { IcpUser } from '../../auth/entities/icp.user.entity';
+import { Shipment } from '../../shipments/entities/shipment.entity';
+import { Route } from '../../routes/entities/route.entity';
+import { CarrierConfiguration } from '../../carriers/entities/carrier-configuration.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
 @Entity()
