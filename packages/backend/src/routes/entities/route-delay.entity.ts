@@ -6,7 +6,7 @@ export class RouteDelay {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => RouteStop)
+  @ManyToOne(() => RouteStop, { cascade: true, onDelete: 'CASCADE' })
   stop: RouteStop;
 
   @Column('timestamptz')

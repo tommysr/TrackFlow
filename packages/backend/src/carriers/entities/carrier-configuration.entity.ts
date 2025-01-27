@@ -10,12 +10,9 @@ export class CarrierConfiguration {
   @JoinColumn()
   carrier: Carrier;
 
-  @Column('float')
-  fuelEfficiency: number;
+  @Column('float', { nullable: true })
+  fuelEfficiency?: number;
 
-  @Column('float')
-  fuelCostPerLiter: number;
-
-  @Column('jsonb', { nullable: true })
-  additionalSettings?: object;
+  @Column('float', { nullable: true })
+  fuelCostPerLiter?: number;
 } 

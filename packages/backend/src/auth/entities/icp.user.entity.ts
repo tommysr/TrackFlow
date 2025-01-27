@@ -1,3 +1,5 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString } from 'class-validator';
 import { Entity, Column, PrimaryColumn, OneToOne } from 'typeorm';
 
 export enum UserRole {

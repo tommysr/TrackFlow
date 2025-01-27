@@ -12,7 +12,7 @@ import {
 import { Carrier } from '../../carriers/entities/carrier.entity';
 import { RouteSegment } from './routeSegment.entity';
 import { RouteStop } from './routeStop.entity';
-import { Transform, Exclude } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { RouteMetrics } from './route-metrics.entity';
 import { RouteDistanceMatrix } from './route-distance-matrix.entity';
 import { ShipmentRouteHistory } from './shipment-route-history.entity';
@@ -30,7 +30,6 @@ export class Route {
   id: string;
 
   @ManyToOne(() => Carrier, (carrier) => carrier.routes)
-  @Transform(({ value }) => ({ principal: value?.principal }))
   carrier: Carrier;
 
   @Column('decimal', { precision: 10, scale: 2 })
@@ -86,16 +85,28 @@ export class Route {
   })
   fullPath?: object;
 
-  @OneToOne(() => RouteMetrics, metrics => metrics.route, { cascade: true, onDelete: 'CASCADE' })
+  @OneToOne(() => RouteMetrics, (metrics) => metrics.route, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
   metrics: RouteMetrics;
 
-  @OneToOne(() => RouteDistanceMatrix, matrix => matrix.route, { cascade: true, onDelete: 'CASCADE' })
+  @OneToOne(() => RouteDistanceMatrix, (matrix) => matrix.route, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
   distanceMatrix: RouteDistanceMatrix;
 
-  @OneToMany(() => RouteStop, stop => stop.route, { cascade: true, onDelete: 'CASCADE' })
+  @OneToMany(() => RouteStop, (stop) => stop.route, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
   stops: RouteStop[];
 
-  @OneToMany(() => RouteSegment, segment => segment.route, { cascade: true, onDelete: 'CASCADE' })
+  @OneToMany(() => RouteSegment, (segment) => segment.route, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
   segments: RouteSegment[];
 
   @Column({ type: 'timestamptz', nullable: true })
@@ -104,6 +115,9 @@ export class Route {
   @Column({ type: 'timestamptz', nullable: true })
   completedAt: Date;
 
-  @OneToMany(() => ShipmentRouteHistory, history => history.route, { cascade: true, onDelete: 'CASCADE' })
+  @OneToMany(() => ShipmentRouteHistory, (history) => history.route, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
   shipmentHistory: ShipmentRouteHistory[];
 }

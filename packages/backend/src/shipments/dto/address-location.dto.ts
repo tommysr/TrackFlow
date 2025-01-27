@@ -1,25 +1,30 @@
-// packages/backend/src/shipments/dto/address-location.dto.ts
 import { Type } from 'class-transformer';
-import { IsString, IsNotEmpty, IsNumber, ValidateNested, Matches, IsPostalCode } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  ValidateNested,
+  Matches,
+  IsPostalCode,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { LocationDto } from 'src/common/dto/location.dto';
 
-// Base address validation
 export class AddressDto {
   @ApiProperty({
     description: 'Street address including building number',
     example: 'ul. Krakowska 15',
-    pattern: '^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ0-9\\s,.-]+$'
+    pattern: '^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ0-9\\s,.-]+$',
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ0-9\s,.-]+$/)  
+  @Matches(/^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ0-9\s,.-]+$/)
   street: string;
 
   @ApiProperty({
     description: 'City name',
     example: 'Warszawa',
-    pattern: '^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ\\s.-]+$'
+    pattern: '^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ\\s.-]+$',
   })
   @IsString()
   @IsNotEmpty()
@@ -29,7 +34,7 @@ export class AddressDto {
   @ApiProperty({
     description: 'Polish postal code',
     example: '00-001',
-    pattern: '^\\d{2}-\\d{3}$'
+    pattern: '^\\d{2}-\\d{3}$',
   })
   @IsString()
   @IsNotEmpty()
@@ -39,7 +44,7 @@ export class AddressDto {
   @ApiProperty({
     description: 'Country code (only PL supported)',
     example: 'PL',
-    enum: ['PL']
+    enum: ['PL'],
   })
   @IsString()
   @IsNotEmpty()
@@ -51,7 +56,7 @@ export class AddressDto {
 export class AddressLocationDto extends LocationDto {
   @ApiProperty({
     description: 'Address details',
-    type: AddressDto
+    type: AddressDto,
   })
   @ValidateNested()
   @Type(() => AddressDto)
